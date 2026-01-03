@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { EarthquakeFeature, LegendEvent } from '../types';
-import { Activity, Radio, Clock, MapPin, Search, Database, BarChart3, Wifi, Waves, Navigation, AlertTriangle, PanelLeftClose, PanelLeftOpen, Landmark, Skull, Beaker, Zap, Layers, Play, RotateCcw, Target, MousePointer2, ClipboardCheck, ShieldAlert, CheckSquare, Siren, Hammer, ChevronRight } from 'lucide-react';
+import { Activity, Radio, Clock, MapPin, Search, Database, BarChart3, Wifi, Waves, Navigation, AlertTriangle, PanelLeftClose, PanelLeftOpen, Landmark, Skull, Beaker, Zap, Layers, Play, RotateCcw, Target, MousePointer2, ClipboardCheck, ShieldAlert, CheckSquare, Siren, Hammer, ChevronRight, LineChart, AlertOctagon } from 'lucide-react';
 
 interface SidebarProps {
   viewMode: 'live' | 'museum' | 'lab' | 'protocols';
@@ -15,8 +15,8 @@ interface SidebarProps {
   activeLegend: LegendEvent | null;
   labState: { mag: number; depth: number };
   onLabStateChange: (state: { mag: number; depth: number }) => void;
-  labTab: 'impact' | 'wave';
-  onLabTabChange: (tab: 'impact' | 'wave') => void;
+  labTab: 'impact' | 'wave' | 'forecast';
+  onLabTabChange: (tab: 'impact' | 'wave' | 'forecast') => void;
   waveSim: {
       station: { lat: number; lng: number } | null;
       epicenter: { lat: number; lng: number } | null;
@@ -41,6 +41,21 @@ const GO_BAG_ITEMS = [
     { id: 'powerbank', label: 'Portable Power Bank' },
     { id: 'radio', label: 'Hand-crank / Battery Radio' }
 ];
+
+// Helper to calculate energy in Joules
+const calculateEnergy = (mag: number) => {
+    // Gutenberg-Richter energy formula: log E = 4.8 + 1.5M
+    // E = 10^(4.8 + 1.5M)
+    return Math.pow(10, 4.8 + 1.5 * mag);
+};
+
+// Helper to format large numbers
+const formatEnergy = (joules: number) => {
+    if (joules > 1e15) return `${(joules / 1e15).toFixed(2)} PJ`; // PetaJoules
+    if (joules > 1e12) return `${(joules / 1e12).toFixed(2)} TJ`; // TeraJoules
+    if (joules > 1e9) return `${(joules / 1e9).toFixed(2)} GJ`; // GigaJoules
+    return `${(joules / 1e6).toFixed(2)} MJ`; // MegaJoules
+};
 
 const Sidebar: React.FC<SidebarProps> = ({ 
     viewMode,
@@ -97,6 +112,53 @@ const Sidebar: React.FC<SidebarProps> = ({
   const totalEvents = earthquakes.length;
   const maxMag = earthquakes.reduce((max, q) => (q.properties.mag > max ? q.properties.mag : max), 0);
   
+  // -- FORECAST/ANALYTICS CALCULATIONS --
+  const analyticsData = useMemo(() => {
+    if (earthquakes.length === 0) return null;
+
+    // 1. Total Energy
+    let totalEnergyJoules = 0;
+    earthquakes.forEach(q => {
+        totalEnergyJoules += calculateEnergy(q.properties.mag);
+    });
+
+    // 2. Mainshock
+    const mainshock = earthquakes.reduce((prev, current) => 
+        (prev.properties.mag > current.properties.mag) ? prev : current
+    );
+
+    // 3. Frequency Distribution
+    const distribution = {
+        micro: 0, // <3
+        minor: 0, // 3-3.9
+        light: 0, // 4-4.9
+        moderate: 0, // 5-5.9
+        strong: 0 // 6+
+    };
+
+    earthquakes.forEach(q => {
+        const m = q.properties.mag;
+        if (m < 3) distribution.micro++;
+        else if (m < 4) distribution.minor++;
+        else if (m < 5) distribution.light++;
+        else if (m < 6) distribution.moderate++;
+        else distribution.strong++;
+    });
+
+    // 4. Forecast Text Generation (Bath's Law / Omori's Law approximation)
+    let forecastText = "";
+    if (mainshock.properties.mag < 4.5) {
+        forecastText = "Seismicity levels are currently normal (background level). No significant aftershock sequences are expected based on current data.";
+    } else if (mainshock.properties.mag < 6.0) {
+        forecastText = `A Magnitude ${mainshock.properties.mag.toFixed(1)} event typically generates a short aftershock sequence. Expect several events of Mag ${Math.max(0, mainshock.properties.mag - 1.2).toFixed(1)} or greater in the next 24-48 hours.`;
+    } else {
+        forecastText = `ALERT: Significant energy release detected (M${mainshock.properties.mag.toFixed(1)}). Statistical models (Bath's Law) suggest a high probability of a Mag ${(mainshock.properties.mag - 1.2).toFixed(1)}+ aftershock. Secondary aftershocks may persist for weeks.`;
+    }
+
+    return { totalEnergyJoules, mainshock, distribution, forecastText };
+  }, [earthquakes]);
+
+
   // Format helper
   const formatTimeAgo = (timestamp: number) => {
     const diff = (Date.now() - timestamp) / 60000; // minutes
@@ -578,9 +640,17 @@ const Sidebar: React.FC<SidebarProps> = ({
                         >
                             Wave Analysis
                         </button>
+                        <button
+                            onClick={() => onLabTabChange('forecast')}
+                            className={`flex-1 py-2 text-xs font-bold uppercase rounded-md transition-all ${
+                                labTab === 'forecast' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                        >
+                            Forecast
+                        </button>
                     </div>
 
-                    {labTab === 'impact' ? (
+                    {labTab === 'impact' && (
                     <div className="space-y-6 animate-fadeIn">
                         <p className="text-purple-400 font-mono text-xs leading-relaxed">
                             Adjust parameters to visualize the relationship between energy release, depth attenuation, and surface intensity.
@@ -656,7 +726,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                             <strong className="text-slate-200">NOTE:</strong> As depth increases, the seismic waves attenuate (weaken) before reaching the surface. This causes the "Felt Radius" to shrink, even though the total energy release remains the same.
                         </div>
                     </div>
-                    ) : (
+                    )}
+
+                    {labTab === 'wave' && (
                     <div className="space-y-6 animate-fadeIn">
                         <p className="text-blue-400 font-mono text-xs leading-relaxed">
                             Simulate P-Wave and S-Wave propagation to understand the delay between the initial jolt and heavy shaking.
@@ -735,6 +807,77 @@ const Sidebar: React.FC<SidebarProps> = ({
                              </div>
                         )}
                     </div>
+                    )}
+
+                    {labTab === 'forecast' && analyticsData && (
+                        <div className="space-y-6 animate-fadeIn">
+                            <p className="text-amber-400 font-mono text-xs leading-relaxed">
+                                Statistical analysis of the last 24 hours of seismic data to model energy release and aftershock probability.
+                            </p>
+
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="bg-slate-900 border border-slate-700 p-3">
+                                    <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Total Energy</div>
+                                    <div className="text-lg font-bold text-white font-mono">{formatEnergy(analyticsData.totalEnergyJoules)}</div>
+                                </div>
+                                <div className="bg-slate-900 border border-slate-700 p-3 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => onSelect(analyticsData.mainshock.id, analyticsData.mainshock)}>
+                                    <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                        Mainshock <MousePointer2 className="w-3 h-3" />
+                                    </div>
+                                    <div className="text-lg font-bold text-red-500 font-mono">M{analyticsData.mainshock.properties.mag.toFixed(1)}</div>
+                                </div>
+                            </div>
+
+                            {/* Frequency Distribution Chart */}
+                            <div className="bg-slate-900/50 border border-slate-800 p-4">
+                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                    <BarChart3 className="w-3 h-3" /> Frequency-Magnitude Distribution
+                                </h4>
+                                <div className="h-32 flex items-end gap-2 px-2 pb-2 border-b border-l border-slate-700">
+                                    {Object.entries(analyticsData.distribution).map(([key, count]) => {
+                                        const max = Math.max(...Object.values(analyticsData.distribution));
+                                        const height = max > 0 ? (count / max) * 100 : 0;
+                                        
+                                        // Colors based on magnitude range logic
+                                        let bg = 'bg-slate-700';
+                                        if (key === 'minor') bg = 'bg-emerald-500';
+                                        if (key === 'light') bg = 'bg-yellow-500';
+                                        if (key === 'moderate') bg = 'bg-orange-500';
+                                        if (key === 'strong') bg = 'bg-red-500';
+
+                                        return (
+                                            <div key={key} className="flex-1 flex flex-col items-center gap-1 group">
+                                                <div 
+                                                    className={`w-full rounded-t-sm transition-all duration-500 ${bg} opacity-80 group-hover:opacity-100`} 
+                                                    style={{ height: `${Math.max(height, 5)}%` }}
+                                                ></div>
+                                                <span className="text-[9px] text-slate-500 uppercase font-mono">{key.slice(0, 3)}</span>
+                                                <div className="absolute -mt-6 text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 px-1 rounded border border-slate-700">
+                                                    {count}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <div className="text-[9px] text-center text-slate-600 mt-2 font-mono">MAGNITUDE CLASS (24H)</div>
+                            </div>
+
+                            {/* Forecast Report */}
+                            <div className="bg-amber-950/20 border border-amber-500/30 p-4 relative">
+                                <div className="absolute top-0 right-0 p-2">
+                                    <AlertOctagon className="w-4 h-4 text-amber-500 animate-pulse" />
+                                </div>
+                                <h4 className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-2">Aftershock Probability Report</h4>
+                                <p className="text-xs text-amber-100/80 leading-relaxed font-mono">
+                                    {analyticsData.forecastText}
+                                </p>
+                            </div>
+
+                            <div className="text-[9px] text-slate-500 italic p-2 border-l-2 border-slate-700 bg-slate-900/50">
+                                <strong>DISCLAIMER:</strong> This is a statistical model based on Gutenberg-Richter and Omori laws. It is not a prediction of future events. Earthquakes cannot be predicted with precision.
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>

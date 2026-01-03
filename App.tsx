@@ -69,7 +69,7 @@ const App: React.FC = () => {
   const [currentLegendIndex, setCurrentLegendIndex] = useState(0);
 
   // Lab State
-  const [labTab, setLabTab] = useState<'impact' | 'wave'>('impact');
+  const [labTab, setLabTab] = useState<'impact' | 'wave' | 'forecast'>('impact');
   const [labState, setLabState] = useState({ mag: 5.0, depth: 10 });
   const [waveSim, setWaveSim] = useState<WaveSimState>({
       station: null,

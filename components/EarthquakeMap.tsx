@@ -13,7 +13,7 @@ interface MapProps {
   viewMode: 'live' | 'museum' | 'lab' | 'protocols';
   activeLegend: LegendEvent | null;
   labState: { mag: number; depth: number };
-  labTab: 'impact' | 'wave';
+  labTab: 'impact' | 'wave' | 'forecast';
   waveSim: {
       station: { lat: number; lng: number } | null;
       epicenter: { lat: number; lng: number } | null;
