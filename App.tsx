@@ -6,7 +6,7 @@ import MuseumSlider from './components/MuseumSlider';
 import { fetchEarthquakes } from './services/usgs';
 import { LEGENDS } from './data/legends';
 import { EarthquakeFeature, USGSGeoJSON } from './types';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Scan, Map as MapIcon, Globe } from 'lucide-react';
 
 // --- Sound Utility ---
 const playSonarPing = () => {
@@ -50,6 +50,9 @@ interface LabState {
     location: { lat: number; lng: number } | null;
 }
 
+const IDLE_TIMEOUT = 60000; // 60 seconds
+const PATROL_INTERVAL = 10000; // 10 seconds
+
 const App: React.FC = () => {
   const [earthquakes, setEarthquakes] = useState<EarthquakeFeature[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,7 +89,56 @@ const App: React.FC = () => {
       sRadius: 0
   });
 
+  // --- SCREENSAVER / PATROL MODE STATE ---
+  const [isIdle, setIsIdle] = useState(false);
+  const [patrolIndex, setPatrolIndex] = useState(0);
+  const idleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const activeLegend = useMemo(() => LEGENDS[currentLegendIndex], [currentLegendIndex]);
+
+  // Derive Patrol Targets (Top 20 largest events)
+  const patrolTargets = useMemo(() => {
+      return [...earthquakes]
+          .sort((a, b) => b.properties.mag - a.properties.mag)
+          .slice(0, 20);
+  }, [earthquakes]);
+
+  const currentPatrolTarget = isIdle && patrolTargets.length > 0 ? patrolTargets[patrolIndex] : null;
+
+  // --- IDLE DETECTION ---
+  const resetIdleTimer = useCallback(() => {
+      setIsIdle(false);
+      if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+      idleTimeoutRef.current = setTimeout(() => {
+          setIsIdle(true);
+          setPatrolIndex(0); // Start patrol from top
+      }, IDLE_TIMEOUT);
+  }, []);
+
+  useEffect(() => {
+      const events = ['mousemove', 'mousedown', 'click', 'scroll', 'keypress'];
+      events.forEach(event => window.addEventListener(event, resetIdleTimer));
+      
+      // Start timer on mount
+      resetIdleTimer();
+
+      return () => {
+          events.forEach(event => window.removeEventListener(event, resetIdleTimer));
+          if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+      };
+  }, [resetIdleTimer]);
+
+  // --- PATROL LOOP ---
+  useEffect(() => {
+      if (!isIdle || patrolTargets.length === 0) return;
+
+      const interval = setInterval(() => {
+          setPatrolIndex(prev => (prev + 1) % patrolTargets.length);
+      }, PATROL_INTERVAL);
+
+      return () => clearInterval(interval);
+  }, [isIdle, patrolTargets]);
+
 
   // Define loadData with NO dependencies on 'earthquakes' state to prevent infinite loops
   const loadData = useCallback(async (isSilent = false) => {
@@ -249,8 +301,8 @@ const App: React.FC = () => {
   return (
     <div className="flex h-[100dvh] w-screen bg-[conic-gradient(at_bottom_left,_var(--tw-gradient-stops))] from-slate-950 via-slate-900 to-zinc-950 overflow-hidden relative">
       
-      {/* Mobile Drawer / Desktop Sidebar */}
-      <div className="hidden md:block h-full z-20 shadow-[5px_0_30px_rgba(0,0,0,0.5)]">
+      {/* Mobile Drawer / Desktop Sidebar - Collapses width when idle to let map fill space */}
+      <div className={`hidden md:block h-full z-20 shadow-[5px_0_30px_rgba(0,0,0,0.5)] transition-all duration-1000 ease-in-out flex-shrink-0 overflow-hidden ${isIdle ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-[500px] opacity-100'}`}>
         <Sidebar 
             viewMode={viewMode}
             onViewModeChange={setViewMode}
@@ -274,8 +326,10 @@ const App: React.FC = () => {
 
       {/* Main Map Area */}
       <div className="flex-1 relative h-full flex flex-col min-h-0">
-         {/* Top decorative border */}
-         <div className={`h-1 w-full z-10 flex-none transition-colors duration-500 ${
+         {/* Top decorative border - Fades out when idle */}
+         <div className={`h-1 w-full z-10 flex-none transition-all duration-1000 ${
+             isIdle ? 'opacity-0' : 'opacity-100'
+         } ${
              viewMode === 'live' ? 'bg-gradient-to-r from-cyan-900/0 via-cyan-500/50 to-cyan-900/0' 
              : viewMode === 'museum' ? 'bg-gradient-to-r from-red-900/0 via-red-500/50 to-red-900/0'
              : viewMode === 'lab' ? 'bg-gradient-to-r from-purple-900/0 via-purple-500/50 to-purple-900/0'
@@ -294,7 +348,7 @@ const App: React.FC = () => {
             )}
             
             {/* Error Toast */}
-            {error && viewMode === 'live' && (
+            {error && viewMode === 'live' && !isIdle && (
                 <div className="absolute top-4 right-4 z-50 bg-red-950/90 text-red-100 p-4 border border-red-500/50 flex items-center gap-3 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
                     <AlertCircle className="w-6 h-6 text-red-500" />
                     <div>
@@ -315,19 +369,59 @@ const App: React.FC = () => {
                 labTab={labTab}
                 waveSim={waveSim}
                 onMapClick={handleMapClick}
+                isIdle={isIdle}
+                patrolTarget={currentPatrolTarget}
             />
 
-            {/* Museum Controls */}
-            {viewMode === 'museum' && (
-                <MuseumSlider 
-                    currentIndex={currentLegendIndex} 
-                    onChange={setCurrentLegendIndex} 
-                />
-            )}
+            {/* Museum Controls - Fades when idle */}
+            <div className={`transition-opacity duration-1000 ${isIdle ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                {viewMode === 'museum' && (
+                    <MuseumSlider 
+                        currentIndex={currentLegendIndex} 
+                        onChange={setCurrentLegendIndex} 
+                    />
+                )}
+            </div>
+
+            {/* --- CINEMATIC PATROL OVERLAY (Visible only when Idle) --- */}
+            <div className={`absolute inset-x-0 bottom-24 flex justify-center pointer-events-none transition-all duration-1000 z-[1000] ${isIdle ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                {currentPatrolTarget && (
+                    <div className="text-center space-y-2">
+                        <div className="inline-block bg-slate-950/60 backdrop-blur-md border-y border-cyan-500/30 py-4 px-12 relative overflow-hidden group">
+                             <div className="absolute inset-0 bg-scanline opacity-50"></div>
+                             
+                             <div className="flex items-center justify-center gap-2 text-cyan-500 text-[10px] font-mono tracking-[0.4em] uppercase mb-2">
+                                 <Scan className="w-3 h-3 animate-pulse" />
+                                 <span>Satellite Patrol Mode</span>
+                             </div>
+
+                             <h2 className="text-3xl md:text-5xl font-bold text-white font-mono uppercase tracking-widest drop-shadow-[0_0_15px_rgba(6,182,212,0.6)] leading-none mb-3">
+                                 {currentPatrolTarget.properties.place.split(' of ').pop() || currentPatrolTarget.properties.place}
+                             </h2>
+
+                             <div className="flex justify-center gap-8 text-slate-300 font-mono text-xs md:text-sm tracking-wider">
+                                 <div className="flex items-center gap-2">
+                                     <span className="text-slate-500">MAG</span>
+                                     <span className="text-cyan-400 font-bold text-lg">{currentPatrolTarget.properties.mag.toFixed(1)}</span>
+                                 </div>
+                                 <div className="flex items-center gap-2">
+                                     <span className="text-slate-500">DEPTH</span>
+                                     <span className="text-white font-bold">{currentPatrolTarget.geometry.coordinates[2]} KM</span>
+                                 </div>
+                                 <div className="flex items-center gap-2">
+                                      <Globe className="w-3 h-3 text-slate-500" />
+                                      <span className="text-slate-400">{currentPatrolTarget.geometry.coordinates[1].toFixed(2)}, {currentPatrolTarget.geometry.coordinates[0].toFixed(2)}</span>
+                                 </div>
+                             </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
          </div>
 
-         {/* Mobile Bottom Sheet (Simplified) */}
-         <div className="md:hidden absolute bottom-0 left-0 right-0 h-1/3 bg-slate-900 z-20 border-t border-cyan-500/30">
+         {/* Mobile Bottom Sheet - Fades when idle */}
+         <div className={`md:hidden absolute bottom-0 left-0 right-0 h-1/3 bg-slate-900 z-20 border-t border-cyan-500/30 transition-all duration-1000 ${isIdle ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
              <Sidebar 
                 viewMode={viewMode}
                 onViewModeChange={setViewMode}
@@ -350,8 +444,8 @@ const App: React.FC = () => {
          </div>
       </div>
       
-      {/* Analysis Modal */}
-      {modalQuake && (
+      {/* Analysis Modal - Only if not idle */}
+      {modalQuake && !isIdle && (
           <AnalysisModal 
             quake={modalQuake} 
             onClose={() => setModalQuake(null)} 

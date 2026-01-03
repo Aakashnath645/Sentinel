@@ -21,6 +21,8 @@ interface MapProps {
       sRadius: number;
   };
   onMapClick: (latlng: {lat: number, lng: number}) => void;
+  isIdle: boolean;
+  patrolTarget: EarthquakeFeature | null;
 }
 
 // Fix for React Leaflet type issues
@@ -110,16 +112,33 @@ const MapClickHandler: React.FC<{ onMapClick: (latlng: {lat: number, lng: number
     return null;
 };
 
-// Controller handles flying to locations (Live, Museum, or Lab)
+// Controller handles flying to locations (Live, Museum, Lab, or Patrol)
 const MapController: React.FC<{ 
     selectedId: string | null; 
     earthquakes: EarthquakeFeature[];
     viewMode: 'live' | 'museum' | 'lab' | 'protocols';
     activeLegend: LegendEvent | null;
-}> = ({ selectedId, earthquakes, viewMode, activeLegend }) => {
+    isIdle: boolean;
+    patrolTarget: EarthquakeFeature | null;
+}> = ({ selectedId, earthquakes, viewMode, activeLegend, isIdle, patrolTarget }) => {
   const map = useMap();
 
   useEffect(() => {
+    // 1. Screensaver Patrol Mode (Highest Priority)
+    if (isIdle && patrolTarget) {
+         map.flyTo(
+             [patrolTarget.geometry.coordinates[1], patrolTarget.geometry.coordinates[0]],
+             5, // Cinematic Zoom
+             {
+                 animate: true,
+                 duration: 9, // Slow cinematic pan (almost full 10s interval)
+                 easeLinearity: 0.2
+             }
+         );
+         return; // Skip other logic
+    }
+
+    // 2. Live Mode Selection
     if (viewMode === 'live' && selectedId) {
       const quake = earthquakes.find(q => q.id === selectedId);
       if (quake) {
@@ -128,21 +147,25 @@ const MapController: React.FC<{
           duration: 1.5
         });
       }
-    } else if (viewMode === 'museum' && activeLegend) {
+    } 
+    // 3. Museum Mode Legend
+    else if (viewMode === 'museum' && activeLegend) {
         map.flyTo(activeLegend.coords, 5, {
             animate: true,
             duration: 2
         });
-    } else if (viewMode === 'protocols') {
+    } 
+    // 4. Protocols Mode (Global View)
+    else if (viewMode === 'protocols') {
          map.flyTo([20, 0], 2.5, { animate: true, duration: 1.5 });
     }
-  }, [selectedId, earthquakes, map, viewMode, activeLegend]);
+  }, [selectedId, earthquakes, map, viewMode, activeLegend, isIdle, patrolTarget]);
 
   return null;
 };
 
 const EarthquakeMap: React.FC<MapProps> = ({ 
-    earthquakes, selectedId, onSelect, onAnalyze, viewMode, activeLegend, labState, labTab, waveSim, onMapClick 
+    earthquakes, selectedId, onSelect, onAnalyze, viewMode, activeLegend, labState, labTab, waveSim, onMapClick, isIdle, patrolTarget
 }) => {
   const [tectonicPlates, setTectonicPlates] = useState<any>(null);
   
@@ -184,6 +207,7 @@ const EarthquakeMap: React.FC<MapProps> = ({
         worldCopyJump={true}
         maxBounds={[[-90, -Infinity], [90, Infinity]]}
         maxBoundsViscosity={1.0}
+        zoomControl={!isIdle} // Hide controls when idle
         >
         <MapResizer />
         <MapClickHandler onMapClick={onMapClick} />
@@ -210,6 +234,8 @@ const EarthquakeMap: React.FC<MapProps> = ({
             earthquakes={earthquakes} 
             viewMode={viewMode}
             activeLegend={activeLegend}
+            isIdle={isIdle}
+            patrolTarget={patrolTarget}
         />
 
         {/* LIVE MODE MARKERS */}
@@ -218,6 +244,8 @@ const EarthquakeMap: React.FC<MapProps> = ({
             const mag = quake.properties.mag;
             const isSelected = selectedId === quake.id;
             const isTsunami = quake.properties.tsunami === 1;
+            // Highlight current patrol target if idle
+            const isPatrolTarget = isIdle && patrolTarget?.id === quake.id;
             
             const depthColor = getDepthColor(depth);
             const radius = getRadius(mag);
@@ -239,10 +267,10 @@ const EarthquakeMap: React.FC<MapProps> = ({
                     radius={radius}
                     className="quake-marker"
                     pathOptions={{
-                        color: depthColor,
+                        color: isPatrolTarget ? '#ffffff' : depthColor, // White highlight for patrol
                         fillColor: depthColor,
-                        fillOpacity: isSelected ? 0.9 : 0.5,
-                        weight: isSelected ? 2 : 1,
+                        fillOpacity: isSelected || isPatrolTarget ? 0.9 : 0.5,
+                        weight: isSelected || isPatrolTarget ? 3 : 1,
                     }}
                     eventHandlers={{
                         click: () => onSelect(quake.id, quake),
@@ -250,45 +278,47 @@ const EarthquakeMap: React.FC<MapProps> = ({
                         mouseout: (e) => { e.target.setStyle({ fillOpacity: isSelected ? 0.9 : 0.5, weight: isSelected ? 2 : 1 }); }
                     }}
                 >
-                    <PopupFixed className="custom-popup" closeButton={false} maxWidth={300}>
-                    <div className="font-mono text-slate-200">
-                        <div className="flex items-center justify-between gap-3 mb-3 pb-2 border-b border-cyan-900/50">
-                            <h3 className="font-bold text-cyan-50 text-xs uppercase leading-snug tracking-wider">{quake.properties.place}</h3>
-                        </div>
-                        {isTsunami && (
-                            <div className="mb-3 bg-cyan-950/50 border border-cyan-500/50 p-2 flex items-center gap-2 animate-pulse">
-                                <Waves className="w-4 h-4 text-cyan-400" />
-                                <span className="text-xs font-bold text-cyan-100 uppercase tracking-widest">Tsunami Warning</span>
+                    {!isIdle && ( // Hide Popups during Screensaver
+                        <PopupFixed className="custom-popup" closeButton={false} maxWidth={300}>
+                        <div className="font-mono text-slate-200">
+                            <div className="flex items-center justify-between gap-3 mb-3 pb-2 border-b border-cyan-900/50">
+                                <h3 className="font-bold text-cyan-50 text-xs uppercase leading-snug tracking-wider">{quake.properties.place}</h3>
                             </div>
-                        )}
-                        <div className="grid grid-cols-2 gap-4 text-xs text-slate-400 mb-4">
-                            <div className="flex flex-col gap-1">
-                                <span className="uppercase text-[9px] tracking-wider text-slate-500">Depth</span>
-                                <div className="flex items-center gap-1.5" style={{ color: depthColor }}>
-                                    <Activity className="w-3 h-3" />
-                                    <span className="font-bold">{depth} KM</span>
+                            {isTsunami && (
+                                <div className="mb-3 bg-cyan-950/50 border border-cyan-500/50 p-2 flex items-center gap-2 animate-pulse">
+                                    <Waves className="w-4 h-4 text-cyan-400" />
+                                    <span className="text-xs font-bold text-cyan-100 uppercase tracking-widest">Tsunami Warning</span>
+                                </div>
+                            )}
+                            <div className="grid grid-cols-2 gap-4 text-xs text-slate-400 mb-4">
+                                <div className="flex flex-col gap-1">
+                                    <span className="uppercase text-[9px] tracking-wider text-slate-500">Depth</span>
+                                    <div className="flex items-center gap-1.5" style={{ color: depthColor }}>
+                                        <Activity className="w-3 h-3" />
+                                        <span className="font-bold">{depth} KM</span>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <span className="uppercase text-[9px] tracking-wider text-slate-500">Mag</span>
+                                    <div className="flex items-center gap-1.5 font-bold text-slate-200">
+                                        <Radio className="w-3 h-3" />
+                                        <span>{mag.toFixed(1)}</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex flex-col gap-1">
-                                <span className="uppercase text-[9px] tracking-wider text-slate-500">Mag</span>
-                                <div className="flex items-center gap-1.5 font-bold text-slate-200">
-                                    <Radio className="w-3 h-3" />
-                                    <span>{mag.toFixed(1)}</span>
-                                </div>
-                            </div>
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onAnalyze(quake);
+                                }}
+                                className="w-full group flex items-center justify-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 hover:border-cyan-400 text-cyan-400 hover:text-cyan-300 text-xs font-bold py-2.5 px-3 transition-all tracking-widest uppercase shadow-[0_0_10px_rgba(6,182,212,0.1)] hover:shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+                            >
+                                <ScanLine className="w-3 h-3 group-hover:animate-pulse" />
+                                <span>Initiate AI Analysis</span>
+                            </button>
                         </div>
-                        <button 
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onAnalyze(quake);
-                            }}
-                            className="w-full group flex items-center justify-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 hover:border-cyan-400 text-cyan-400 hover:text-cyan-300 text-xs font-bold py-2.5 px-3 transition-all tracking-widest uppercase shadow-[0_0_10px_rgba(6,182,212,0.1)] hover:shadow-[0_0_15px_rgba(6,182,212,0.3)]"
-                        >
-                            <ScanLine className="w-3 h-3 group-hover:animate-pulse" />
-                            <span>Initiate AI Analysis</span>
-                        </button>
-                    </div>
-                    </PopupFixed>
+                        </PopupFixed>
+                    )}
                 </CircleMarker>
               </React.Fragment>
             );
@@ -318,12 +348,14 @@ const EarthquakeMap: React.FC<MapProps> = ({
                         fillOpacity: 1
                     }}
                 >
-                     <PopupFixed className="custom-popup" closeButton={false} maxWidth={300}>
-                         <div className="font-mono text-slate-200">
-                            <h3 className="font-bold text-red-500 text-sm uppercase mb-1">{activeLegend.year} EPICENTER</h3>
-                            <div className="text-xs text-slate-300">{activeLegend.place}</div>
-                         </div>
-                     </PopupFixed>
+                     {!isIdle && (
+                        <PopupFixed className="custom-popup" closeButton={false} maxWidth={300}>
+                            <div className="font-mono text-slate-200">
+                                <h3 className="font-bold text-red-500 text-sm uppercase mb-1">{activeLegend.year} EPICENTER</h3>
+                                <div className="text-xs text-slate-300">{activeLegend.place}</div>
+                            </div>
+                        </PopupFixed>
+                     )}
                 </CircleMarker>
             </React.Fragment>
         )}
@@ -354,24 +386,26 @@ const EarthquakeMap: React.FC<MapProps> = ({
                         fillOpacity: 0.8
                     }}
                 >
-                     <PopupFixed className="custom-popup" closeButton={false} maxWidth={300} autoPan={false}>
-                         <div className="font-mono text-slate-200">
-                            <div className="flex items-center gap-2 mb-2 text-purple-400">
-                                <Beaker className="w-4 h-4" />
-                                <h3 className="font-bold text-sm uppercase">SIMULATION SITE</h3>
-                            </div>
-                            <div className="text-xs space-y-1">
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Magnitude:</span>
-                                    <span className="font-bold text-purple-300">{labState.mag.toFixed(1)}</span>
+                     {!isIdle && (
+                         <PopupFixed className="custom-popup" closeButton={false} maxWidth={300} autoPan={false}>
+                             <div className="font-mono text-slate-200">
+                                <div className="flex items-center gap-2 mb-2 text-purple-400">
+                                    <Beaker className="w-4 h-4" />
+                                    <h3 className="font-bold text-sm uppercase">SIMULATION SITE</h3>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Depth:</span>
-                                    <span className="font-bold text-blue-300">{labState.depth} km</span>
+                                <div className="text-xs space-y-1">
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500">Magnitude:</span>
+                                        <span className="font-bold text-purple-300">{labState.mag.toFixed(1)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500">Depth:</span>
+                                        <span className="font-bold text-blue-300">{labState.depth} km</span>
+                                    </div>
                                 </div>
-                            </div>
-                         </div>
-                     </PopupFixed>
+                             </div>
+                         </PopupFixed>
+                     )}
                 </CircleMarker>
                 <CircleMarker
                     center={labState.location}
@@ -388,18 +422,22 @@ const EarthquakeMap: React.FC<MapProps> = ({
                 {/* Station */}
                 {waveSim.station && (
                      <Marker position={waveSim.station} icon={stationIcon}>
-                         <PopupFixed className="custom-popup" closeButton={false} offset={[0, -10]}>
-                             <div className="font-mono text-blue-400 font-bold text-xs">SEISMOMETER STATION</div>
-                         </PopupFixed>
+                         {!isIdle && (
+                             <PopupFixed className="custom-popup" closeButton={false} offset={[0, -10]}>
+                                 <div className="font-mono text-blue-400 font-bold text-xs">SEISMOMETER STATION</div>
+                             </PopupFixed>
+                         )}
                      </Marker>
                 )}
 
                 {/* Epicenter */}
                 {waveSim.epicenter && (
                      <Marker position={waveSim.epicenter} icon={epicenterIcon}>
-                         <PopupFixed className="custom-popup" closeButton={false} offset={[0, -10]}>
-                             <div className="font-mono text-red-400 font-bold text-xs">TEST EPICENTER</div>
-                         </PopupFixed>
+                         {!isIdle && (
+                             <PopupFixed className="custom-popup" closeButton={false} offset={[0, -10]}>
+                                 <div className="font-mono text-red-400 font-bold text-xs">TEST EPICENTER</div>
+                             </PopupFixed>
+                         )}
                      </Marker>
                 )}
 
