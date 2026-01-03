@@ -67,3 +67,16 @@ export interface GroundingChunk {
         }[]
     }
 }
+
+export interface LegendEvent {
+  id: string;
+  place: string;
+  mag: number;
+  date: string;
+  year: number;
+  coords: [number, number]; // Lat, Lng for Leaflet
+  depth: number;
+  casualties: string;
+  description: string;
+  impactRadiusKm: number;
+}

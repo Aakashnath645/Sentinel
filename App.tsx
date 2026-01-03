@@ -2,12 +2,13 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import Sidebar from './components/Sidebar';
 import EarthquakeMap from './components/EarthquakeMap';
 import AnalysisModal from './components/AnalysisModal';
+import MuseumSlider from './components/MuseumSlider';
 import { fetchEarthquakes } from './services/usgs';
+import { LEGENDS } from './data/legends';
 import { EarthquakeFeature, USGSGeoJSON } from './types';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 // --- Sound Utility ---
-// Generates a "Sci-Fi Sonar Ping" using Web Audio API to avoid external assets
 const playSonarPing = () => {
     try {
         const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
@@ -20,14 +21,12 @@ const playSonarPing = () => {
         osc.connect(gain);
         gain.connect(ctx.destination);
 
-        // Sonar Tone: High pitched Sine wave with a distinct ping envelope
         osc.type = 'sine';
         osc.frequency.setValueAtTime(1200, ctx.currentTime);
         
-        // Envelope: Sharp attack, long smooth decay
         gain.gain.setValueAtTime(0, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.05); // Attack
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5); // Decay
+        gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
 
         osc.start();
         osc.stop(ctx.currentTime + 1.5);
@@ -56,6 +55,15 @@ const App: React.FC = () => {
   // Modal State
   const [modalQuake, setModalQuake] = useState<EarthquakeFeature | null>(null);
 
+  // View Mode State
+  const [viewMode, setViewMode] = useState<'live' | 'museum' | 'lab'>('live');
+  const [currentLegendIndex, setCurrentLegendIndex] = useState(0);
+
+  // Lab State
+  const [labState, setLabState] = useState({ mag: 5.0, depth: 10 });
+
+  const activeLegend = useMemo(() => LEGENDS[currentLegendIndex], [currentLegendIndex]);
+
   // Define loadData with NO dependencies on 'earthquakes' state to prevent infinite loops
   const loadData = useCallback(async (isSilent = false) => {
     try {
@@ -63,8 +71,6 @@ const App: React.FC = () => {
       
       const data: USGSGeoJSON = await fetchEarthquakes();
       
-      // Check for new major earthquakes (Mag >= 5.0) for audio alert
-      // We only run this check if it is NOT the initial load
       if (!isInitialLoadRef.current) {
           const newMajorQuakes = data.features.filter(f => {
               const isMajor = f.properties.mag >= 5.0;
@@ -77,12 +83,10 @@ const App: React.FC = () => {
           }
       }
 
-      // Update refs
       const currentIds = new Set(data.features.map(f => f.id));
       previousIdsRef.current = currentIds;
       isInitialLoadRef.current = false;
 
-      // Ensure sorted by time descending
       const sorted = data.features.sort((a, b) => b.properties.time - a.properties.time);
       
       setEarthquakes(sorted);
@@ -98,10 +102,8 @@ const App: React.FC = () => {
 
   // Initial fetch, Poll, and Geolocation
   useEffect(() => {
-    // Initial load (shows spinner)
     loadData(false);
     
-    // Get Location
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             (position) => {
@@ -116,7 +118,6 @@ const App: React.FC = () => {
         );
     }
 
-    // Background polling every 60s (no spinner)
     const interval = setInterval(() => {
         loadData(true);
     }, 60000);
@@ -124,12 +125,10 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [loadData]);
 
-  // Filter Logic
   const filteredEarthquakes = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return earthquakes;
 
-    // Check for magnitude filter pattern (e.g. ">5", "m5", "5+")
     const magMatch = query.match(/^(?:>|>=|m)\s*(\d+(?:\.\d+)?)\+?$/);
     
     if (magMatch) {
@@ -137,7 +136,6 @@ const App: React.FC = () => {
       return earthquakes.filter(q => q.properties.mag >= minMag);
     }
 
-    // Default: Filter by location name
     return earthquakes.filter(q => q.properties.place.toLowerCase().includes(query));
   }, [earthquakes, searchQuery]);
 
@@ -155,6 +153,8 @@ const App: React.FC = () => {
       {/* Mobile Drawer / Desktop Sidebar */}
       <div className="hidden md:block h-full z-20 shadow-[5px_0_30px_rgba(0,0,0,0.5)]">
         <Sidebar 
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
             earthquakes={filteredEarthquakes} 
             onSelect={handleSelect} 
             selectedId={selectedId}
@@ -162,17 +162,24 @@ const App: React.FC = () => {
             searchQuery={searchQuery}
             onSearch={setSearchQuery}
             userLocation={userLocation}
+            activeLegend={activeLegend}
+            labState={labState}
+            onLabStateChange={setLabState}
         />
       </div>
 
       {/* Main Map Area */}
       <div className="flex-1 relative h-full flex flex-col min-h-0">
          {/* Top decorative border */}
-         <div className="h-1 bg-gradient-to-r from-cyan-900/0 via-cyan-500/50 to-cyan-900/0 w-full z-10 flex-none" />
+         <div className={`h-1 w-full z-10 flex-none transition-colors duration-500 ${
+             viewMode === 'live' ? 'bg-gradient-to-r from-cyan-900/0 via-cyan-500/50 to-cyan-900/0' 
+             : viewMode === 'museum' ? 'bg-gradient-to-r from-red-900/0 via-red-500/50 to-red-900/0'
+             : 'bg-gradient-to-r from-purple-900/0 via-purple-500/50 to-purple-900/0'
+         }`} />
 
          <div className="relative flex-1 bg-slate-950/50 min-h-0">
              {/* Loading Overlay */}
-            {loading && (
+            {loading && viewMode === 'live' && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm">
                     <div className="flex flex-col items-center gap-4">
                         <Loader2 className="w-16 h-16 text-cyan-400 animate-spin" />
@@ -182,7 +189,7 @@ const App: React.FC = () => {
             )}
             
             {/* Error Toast */}
-            {error && (
+            {error && viewMode === 'live' && (
                 <div className="absolute top-4 right-4 z-50 bg-red-950/90 text-red-100 p-4 border border-red-500/50 flex items-center gap-3 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
                     <AlertCircle className="w-6 h-6 text-red-500" />
                     <div>
@@ -197,12 +204,25 @@ const App: React.FC = () => {
                 selectedId={selectedId}
                 onSelect={handleSelect}
                 onAnalyze={handleAnalyze}
+                viewMode={viewMode}
+                activeLegend={activeLegend}
+                labState={labState}
             />
+
+            {/* Museum Controls */}
+            {viewMode === 'museum' && (
+                <MuseumSlider 
+                    currentIndex={currentLegendIndex} 
+                    onChange={setCurrentLegendIndex} 
+                />
+            )}
          </div>
 
          {/* Mobile Bottom Sheet (Simplified) */}
          <div className="md:hidden absolute bottom-0 left-0 right-0 h-1/3 bg-slate-900 z-20 border-t border-cyan-500/30">
              <Sidebar 
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
                 earthquakes={filteredEarthquakes} 
                 onSelect={handleSelect} 
                 selectedId={selectedId}
@@ -210,6 +230,9 @@ const App: React.FC = () => {
                 searchQuery={searchQuery}
                 onSearch={setSearchQuery}
                 userLocation={userLocation}
+                activeLegend={activeLegend}
+                labState={labState}
+                onLabStateChange={setLabState}
             />
          </div>
       </div>
