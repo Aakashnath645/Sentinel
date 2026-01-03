@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Circle, Popup, useMap, AttributionControl, GeoJSON } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Circle, Popup, useMap, AttributionControl, GeoJSON, useMapEvents, Marker } from 'react-leaflet';
 import { EarthquakeFeature, LegendEvent } from '../types';
 import { fetchTectonicPlates } from '../services/usgs';
-import { Activity, Radio, Waves, ScanLine, Beaker } from 'lucide-react';
+import { Activity, Radio, Waves, ScanLine, Beaker, MapPin } from 'lucide-react';
 import L from 'leaflet';
 
 interface MapProps {
@@ -13,6 +13,14 @@ interface MapProps {
   viewMode: 'live' | 'museum' | 'lab';
   activeLegend: LegendEvent | null;
   labState: { mag: number; depth: number };
+  labTab: 'impact' | 'wave';
+  waveSim: {
+      station: { lat: number; lng: number } | null;
+      epicenter: { lat: number; lng: number } | null;
+      pRadius: number;
+      sRadius: number;
+  };
+  onMapClick: (latlng: {lat: number, lng: number}) => void;
 }
 
 // Fix for React Leaflet type issues
@@ -20,6 +28,29 @@ const MapContainerFixed = MapContainer as any;
 const TileLayerFixed = TileLayer as any;
 const GeoJSONFixed = GeoJSON as any;
 const PopupFixed = Popup as any;
+
+// Custom Icons for Lab Mode
+const createLabIcon = (color: string) => L.divIcon({
+    className: 'custom-div-icon',
+    html: `<div style="background-color: ${color}; width: 12px; height: 12px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px ${color};"></div>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6]
+});
+
+const stationIcon = L.divIcon({
+    className: 'custom-div-icon',
+    html: `<div style="background-color: #3b82f6; width: 16px; height: 16px; border: 2px solid white; border-radius: 2px; box-shadow: 0 0 10px #3b82f6;"></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8]
+});
+
+const epicenterIcon = L.divIcon({
+    className: 'custom-div-icon',
+    html: `<div style="background-color: #ef4444; width: 16px; height: 16px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 15px #ef4444;" class="animate-pulse"></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8]
+});
+
 
 // --- GEOMETRY UTILS ---
 const shiftGeoJSON = (data: any) => {
@@ -62,6 +93,16 @@ const MapResizer: React.FC = () => {
     return null;
 };
 
+// Handle clicks on the map surface
+const MapClickHandler: React.FC<{ onMapClick: (latlng: {lat: number, lng: number}) => void }> = ({ onMapClick }) => {
+    useMapEvents({
+        click: (e) => {
+            onMapClick(e.latlng);
+        }
+    });
+    return null;
+};
+
 // Controller handles flying to locations (Live, Museum, or Lab)
 const MapController: React.FC<{ 
     selectedId: string | null; 
@@ -86,22 +127,21 @@ const MapController: React.FC<{
             duration: 2
         });
     } else if (viewMode === 'lab') {
-        // Fly to Test Site
-        map.flyTo([0, -160], 5, {
-            animate: true,
-            duration: 2
-        });
+        // Just ensure reasonable zoom, don't force move every time unless necessary
+        // map.flyTo([0, -160], 5, { animate: true, duration: 2 });
     }
   }, [selectedId, earthquakes, map, viewMode, activeLegend]);
 
   return null;
 };
 
-const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, onAnalyze, viewMode, activeLegend, labState }) => {
+const EarthquakeMap: React.FC<MapProps> = ({ 
+    earthquakes, selectedId, onSelect, onAnalyze, viewMode, activeLegend, labState, labTab, waveSim, onMapClick 
+}) => {
   const [tectonicPlates, setTectonicPlates] = useState<any>(null);
   
   // Lab Test Site Coordinates (Middle of Pacific)
-  const LAB_COORDS: [number, number] = [0, -160];
+  const LAB_IMPACT_COORDS: [number, number] = [0, -160];
 
   useEffect(() => {
       fetchTectonicPlates().then(data => {
@@ -122,23 +162,11 @@ const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, 
     return mag < 2 ? 4 : Math.max(mag * 3, 4); 
   };
   
-  // Calculate Lab Impact Radius (Visual Approximation)
-  // Logic: Mag Increases Radius exponentialy. Depth decreases it linearly (attenuation).
-  // Formula: 10^(0.5 * Mag) * (Constant) * AttenuationFactor
+  // Impact Sim Logic
   const getLabImpactRadius = (mag: number, depth: number) => {
-      // Base impact (arbitrary scalar for visual map units)
-      // Mag 1 -> 3km
-      // Mag 9 -> 30,000 km (too big?) 
-      // Let's use simpler felt radius heuristic:
-      // Mag 5 ~ 50km
-      // Mag 8 ~ 800km
       const baseRadiusKm = Math.pow(10, (0.55 * mag - 1.2)); 
-      
-      // Depth attenuation: Deep quakes feel weaker at surface epicenter
-      // Factor = 1 for surface (0km), 0.2 for 700km
       const attenuation = 1 - (depth / 1000); 
-      
-      return baseRadiusKm * Math.max(attenuation, 0.1) * 1000; // Meters
+      return baseRadiusKm * Math.max(attenuation, 0.1) * 1000; 
   };
 
   return (
@@ -148,13 +176,14 @@ const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, 
         zoom={2.5}
         minZoom={2}
         className="w-full h-full z-0 bg-black"
-        style={{ height: '100%', width: '100%', background: '#020617' }}
+        style={{ height: '100%', width: '100%', background: '#020617', cursor: viewMode === 'lab' && labTab === 'wave' ? 'crosshair' : 'grab' }}
         attributionControl={false} 
         worldCopyJump={true}
         maxBounds={[[-90, -Infinity], [90, Infinity]]}
         maxBoundsViscosity={1.0}
         >
         <MapResizer />
+        <MapClickHandler onMapClick={onMapClick} />
         <AttributionControl position="bottomright" prefix={false} />
         <TileLayerFixed
             attribution='&copy; <a href="https://carto.com/">CARTO</a>'
@@ -265,7 +294,6 @@ const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, 
         {/* MUSEUM MODE MARKER */}
         {viewMode === 'museum' && activeLegend && (
             <React.Fragment>
-                {/* Impact Radius */}
                 <Circle 
                     center={activeLegend.coords}
                     radius={activeLegend.impactRadiusKm * 1000} 
@@ -277,8 +305,6 @@ const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, 
                         dashArray: '5, 5'
                     }}
                 />
-                
-                {/* Center Epicenter */}
                 <CircleMarker
                     center={activeLegend.coords}
                     radius={15}
@@ -299,15 +325,14 @@ const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, 
             </React.Fragment>
         )}
         
-        {/* LAB MODE SIMULATION */}
-        {viewMode === 'lab' && (
+        {/* LAB: IMPACT SIMULATION */}
+        {viewMode === 'lab' && labTab === 'impact' && (
             <React.Fragment>
-                {/* Simulation Impact Radius */}
                 <Circle 
-                    center={LAB_COORDS}
+                    center={LAB_IMPACT_COORDS}
                     radius={getLabImpactRadius(labState.mag, labState.depth)} 
                     pathOptions={{
-                        color: '#a855f7', // Purple
+                        color: '#a855f7', 
                         weight: 1,
                         fillColor: '#a855f7',
                         fillOpacity: 0.2,
@@ -315,10 +340,8 @@ const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, 
                         className: 'animate-pulse'
                     }}
                 />
-                
-                {/* Simulation Epicenter Target */}
                 <CircleMarker
-                    center={LAB_COORDS}
+                    center={LAB_IMPACT_COORDS}
                     radius={10}
                     pathOptions={{
                         color: '#fff',
@@ -346,19 +369,51 @@ const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, 
                          </div>
                      </PopupFixed>
                 </CircleMarker>
-                
-                {/* Crosshairs Effect */}
                 <CircleMarker
-                    center={LAB_COORDS}
+                    center={LAB_IMPACT_COORDS}
                     radius={30}
-                    pathOptions={{
-                        color: '#a855f7',
-                        weight: 1,
-                        fill: false,
-                        dashArray: '2, 4'
-                    }}
+                    pathOptions={{ color: '#a855f7', weight: 1, fill: false, dashArray: '2, 4' }}
                     interactive={false}
                 />
+            </React.Fragment>
+        )}
+
+        {/* LAB: WAVE SIMULATION */}
+        {viewMode === 'lab' && labTab === 'wave' && (
+            <React.Fragment>
+                {/* Station */}
+                {waveSim.station && (
+                     <Marker position={waveSim.station} icon={stationIcon}>
+                         <PopupFixed className="custom-popup" closeButton={false} offset={[0, -10]}>
+                             <div className="font-mono text-blue-400 font-bold text-xs">SEISMOMETER STATION</div>
+                         </PopupFixed>
+                     </Marker>
+                )}
+
+                {/* Epicenter */}
+                {waveSim.epicenter && (
+                     <Marker position={waveSim.epicenter} icon={epicenterIcon}>
+                         <PopupFixed className="custom-popup" closeButton={false} offset={[0, -10]}>
+                             <div className="font-mono text-red-400 font-bold text-xs">TEST EPICENTER</div>
+                         </PopupFixed>
+                     </Marker>
+                )}
+
+                {/* Waves */}
+                {waveSim.epicenter && waveSim.pRadius > 0 && (
+                    <Circle 
+                        center={waveSim.epicenter}
+                        radius={waveSim.pRadius * 1000} // km to m
+                        pathOptions={{ color: '#facc15', weight: 2, fill: false, opacity: 0.8 }}
+                    />
+                )}
+                {waveSim.epicenter && waveSim.sRadius > 0 && (
+                    <Circle 
+                        center={waveSim.epicenter}
+                        radius={waveSim.sRadius * 1000} // km to m
+                        pathOptions={{ color: '#ef4444', weight: 4, fill: false, opacity: 0.8 }}
+                    />
+                )}
             </React.Fragment>
         )}
 

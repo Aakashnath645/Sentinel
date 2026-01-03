@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { EarthquakeFeature, LegendEvent } from '../types';
-import { Activity, Radio, Clock, MapPin, Search, Database, BarChart3, Wifi, Waves, Navigation, AlertTriangle, PanelLeftClose, PanelLeftOpen, Landmark, Skull, Beaker, Zap, Layers } from 'lucide-react';
+import { Activity, Radio, Clock, MapPin, Search, Database, BarChart3, Wifi, Waves, Navigation, AlertTriangle, PanelLeftClose, PanelLeftOpen, Landmark, Skull, Beaker, Zap, Layers, Play, RotateCcw, Target, MousePointer2 } from 'lucide-react';
 
 interface SidebarProps {
   viewMode: 'live' | 'museum' | 'lab';
@@ -15,6 +15,16 @@ interface SidebarProps {
   activeLegend: LegendEvent | null;
   labState: { mag: number; depth: number };
   onLabStateChange: (state: { mag: number; depth: number }) => void;
+  labTab: 'impact' | 'wave';
+  onLabTabChange: (tab: 'impact' | 'wave') => void;
+  waveSim: {
+      station: { lat: number; lng: number } | null;
+      epicenter: { lat: number; lng: number } | null;
+      isRunning: boolean;
+      elapsedTime: number;
+  };
+  onWaveReset: () => void;
+  onWaveStart: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -29,7 +39,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     userLocation,
     activeLegend,
     labState,
-    onLabStateChange
+    onLabStateChange,
+    labTab,
+    onLabTabChange,
+    waveSim,
+    onWaveReset,
+    onWaveStart
 }) => {
   const [sortBy, setSortBy] = useState<'time' | 'distance'>('time');
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -68,14 +83,36 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const getEnergyJoules = (mag: number) => {
-      // log E = 5.24 + 1.44M (in Joules approx)
       const exp = 5.24 + 1.44 * mag;
       return `10^${exp.toFixed(1)} J`;
   };
 
-  // Haversine Distance Formula (km)
+  // Wave Helpers
+  const calculateWaveStats = () => {
+      if (!waveSim.station || !waveSim.epicenter) return null;
+      
+      const R = 6371; 
+      const dLat = (waveSim.epicenter.lat - waveSim.station.lat) * (Math.PI / 180);
+      const dLon = (waveSim.epicenter.lng - waveSim.station.lng) * (Math.PI / 180);
+      const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(waveSim.station.lat * (Math.PI / 180)) * Math.cos(waveSim.epicenter.lat * (Math.PI / 180)) * 
+        Math.sin(dLon / 2) * Math.sin(dLon / 2); 
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
+      const dist = R * c; // km
+
+      // Speeds: P = 6km/s, S = 3.5km/s
+      const pTime = dist / 6;
+      const sTime = dist / 3.5;
+
+      return { dist, pTime, sTime };
+  };
+
+  const waveStats = calculateWaveStats();
+
+  // Haversine Distance Formula (km) used for Live Feed
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Earth radius in km
+    const R = 6371; 
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLon = (lon2 - lon1) * (Math.PI / 180);
     const a = 
@@ -86,13 +123,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     return R * c;
   };
 
-  // Process list with distance and sorting
   const sortedEarthquakes = useMemo(() => {
-    // 1. Map to include distance
     const withDistance = earthquakes.map(q => {
         let dist = null;
         if (userLocation) {
-            // GeoJSON is Lng, Lat
             dist = calculateDistance(
                 userLocation.lat, 
                 userLocation.lng, 
@@ -103,7 +137,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         return { ...q, distanceToUser: dist };
     });
 
-    // 2. Sort
     if (sortBy === 'distance' && userLocation) {
         return withDistance.sort((a, b) => {
             if (a.distanceToUser === null) return 1;
@@ -111,7 +144,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             return a.distanceToUser - b.distanceToUser;
         });
     } else {
-        // Default sort by time (already mostly sorted, but enforce it)
         return withDistance.sort((a, b) => b.properties.time - a.properties.time);
     }
   }, [earthquakes, userLocation, sortBy]);
@@ -122,10 +154,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             isCollapsed ? 'md:w-[60px]' : 'md:w-[450px]'
         }`}
     >
-      {/* Background Grid */}
       <div className="absolute inset-0 bg-grid pointer-events-none opacity-20"></div>
 
-      {/* Collapse Toggle Button */}
       <button 
         onClick={() => setIsCollapsed(!isCollapsed)}
         className="absolute right-3 top-3 z-50 p-1.5 text-cyan-500 hover:text-cyan-300 hover:bg-cyan-900/30 rounded-sm transition-colors hidden md:flex items-center justify-center border border-transparent hover:border-cyan-500/30"
@@ -134,7 +164,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
       </button>
 
-      {/* MAIN CONTENT WRAPPER */}
       <div 
         className={`flex-1 flex flex-col h-full w-full md:w-[450px] transition-opacity duration-200 ${
             isCollapsed ? 'opacity-0 pointer-events-none invisible' : 'opacity-100 visible'
@@ -173,7 +202,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {viewMode === 'live' && (
         <>
-            {/* LIVE FEED HEADER */}
             <div className="flex-none px-6 py-6 border-b border-cyan-900/30 bg-slate-900/80 relative overflow-hidden">
                 <div className="absolute inset-0 bg-scanline pointer-events-none opacity-30"></div>
                 <div className="relative z-10">
@@ -199,7 +227,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </div>
                     </div>
                     
-                    {/* HUD Stats Row */}
                     <div className="grid grid-cols-3 gap-2">
                         <div className="bg-slate-900/50 border border-slate-700 p-2 relative group overflow-hidden">
                             <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-cyan-500/50"></div>
@@ -255,7 +282,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
             </div>
 
-            {/* LIVE FEED LIST */}
             <div className="flex-1 overflow-y-auto relative bg-slate-950/80">
                 <div className="absolute left-0 top-0 bottom-0 w-px bg-slate-800 z-0 ml-6"></div>
 
@@ -341,16 +367,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {viewMode === 'museum' && (
-            // MUSEUM MODE CARD
             <div className="flex-1 overflow-y-auto bg-slate-950/80 p-6 flex flex-col relative">
-                {/* Decoration */}
                 <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
                      <Landmark className="w-48 h-48 text-red-500" />
                 </div>
                 
                 {activeLegend ? (
                     <div className="relative z-10 space-y-6 animate-fadeIn">
-                        {/* Header */}
                         <div>
                             <div className="flex items-center gap-2 text-red-500 mb-2">
                                 <Landmark className="w-4 h-4" />
@@ -360,7 +383,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                             <p className="text-red-400 font-mono text-xl mt-1">{activeLegend.year}</p>
                         </div>
 
-                        {/* Big Mag */}
                         <div className="flex items-center gap-4 py-4 border-y border-red-900/30">
                             <div className="w-24 h-24 flex items-center justify-center border-4 border-red-500 text-red-500 bg-red-950/20 shadow-[0_0_30px_rgba(239,68,68,0.2)]">
                                 <span className="text-5xl font-bold font-mono">{activeLegend.mag}</span>
@@ -371,7 +393,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                             </div>
                         </div>
 
-                        {/* Details Grid */}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="bg-slate-900/50 p-3 border-l-2 border-red-500/50">
                                 <div className="flex items-center gap-2 mb-1 text-slate-500">
@@ -389,7 +410,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                             </div>
                         </div>
 
-                        {/* Description */}
                         <div className="bg-slate-900/30 p-4 border border-slate-800">
                             <h3 className="text-xs font-bold text-red-400 uppercase tracking-widest mb-3">Historical Context</h3>
                             <p className="text-sm text-slate-300 leading-relaxed font-sans border-l-2 border-slate-700 pl-4">
@@ -411,96 +431,196 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {viewMode === 'lab' && (
             <div className="flex-1 overflow-y-auto bg-slate-950/80 p-6 flex flex-col relative animate-fadeIn">
-                 {/* Decoration */}
                  <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
                      <Beaker className="w-48 h-48 text-purple-500" />
                 </div>
 
-                <div className="relative z-10 space-y-8">
+                <div className="relative z-10 space-y-6">
                      {/* Header */}
                      <div>
                         <div className="flex items-center gap-2 text-purple-500 mb-2">
                             <Beaker className="w-4 h-4" />
                             <span className="text-[10px] font-bold tracking-[0.3em] uppercase">Seismic Laboratory</span>
                         </div>
-                        <h2 className="text-2xl font-bold text-white font-mono leading-tight">IMPACT SIMULATION</h2>
-                        <p className="text-purple-400 font-mono text-xs mt-2 leading-relaxed">
+                        <h2 className="text-2xl font-bold text-white font-mono leading-tight">EXPERIMENT CONSOLE</h2>
+                    </div>
+                    
+                    {/* LAB SUB-NAVIGATION */}
+                    <div className="flex border border-slate-800 rounded-lg p-1 bg-slate-900/50">
+                        <button
+                            onClick={() => onLabTabChange('impact')}
+                            className={`flex-1 py-2 text-xs font-bold uppercase rounded-md transition-all ${
+                                labTab === 'impact' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                        >
+                            Impact Sim
+                        </button>
+                        <button
+                            onClick={() => onLabTabChange('wave')}
+                            className={`flex-1 py-2 text-xs font-bold uppercase rounded-md transition-all ${
+                                labTab === 'wave' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                        >
+                            Wave Analysis
+                        </button>
+                    </div>
+
+                    {labTab === 'impact' ? (
+                    <div className="space-y-6 animate-fadeIn">
+                        <p className="text-purple-400 font-mono text-xs leading-relaxed">
                             Adjust parameters to visualize the relationship between energy release, depth attenuation, and surface intensity.
                         </p>
-                    </div>
-
-                    {/* Sliders */}
-                    <div className="space-y-6 bg-slate-900/50 p-4 border border-slate-800">
-                        {/* Magnitude Slider */}
-                        <div>
-                            <div className="flex justify-between items-center mb-2">
-                                <div className="flex items-center gap-2 text-purple-400">
-                                    <Zap className="w-4 h-4" />
-                                    <span className="text-xs font-bold uppercase tracking-wider">Magnitude</span>
-                                </div>
-                                <span className="font-mono text-xl font-bold text-white">{labState.mag.toFixed(1)}</span>
-                            </div>
-                            <input 
-                                type="range" 
-                                min="1" 
-                                max="10" 
-                                step="0.1"
-                                value={labState.mag}
-                                onChange={(e) => onLabStateChange({...labState, mag: parseFloat(e.target.value)})}
-                                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500 hover:accent-purple-400"
-                            />
-                            <div className="flex justify-between text-[9px] text-slate-500 font-mono mt-1">
-                                <span>1.0</span>
-                                <span>10.0</span>
-                            </div>
-                        </div>
-
-                        {/* Depth Slider */}
-                        <div>
-                            <div className="flex justify-between items-center mb-2">
-                                <div className="flex items-center gap-2 text-blue-400">
-                                    <Layers className="w-4 h-4" />
-                                    <span className="text-xs font-bold uppercase tracking-wider">Depth (KM)</span>
-                                </div>
-                                <span className="font-mono text-xl font-bold text-white">{labState.depth} km</span>
-                            </div>
-                            <input 
-                                type="range" 
-                                min="0" 
-                                max="700" 
-                                step="10"
-                                value={labState.depth}
-                                onChange={(e) => onLabStateChange({...labState, depth: parseInt(e.target.value)})}
-                                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400"
-                            />
-                            <div className="flex justify-between text-[9px] text-slate-500 font-mono mt-1">
-                                <span>0 km (Surface)</span>
-                                <span>700 km (Deep)</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Output Card */}
-                    <div className="bg-purple-950/20 border border-purple-500/30 p-4 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-purple-500/50"></div>
-                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-purple-500/50"></div>
                         
-                        <h4 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-4">TNT Equivalence</h4>
-                        
-                        <div className="text-center space-y-2">
-                             <div className="text-xl md:text-2xl font-bold text-white font-mono leading-tight drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]">
-                                {getTNTEquivalent(labState.mag)}
-                             </div>
-                             <div className="text-xs font-mono text-purple-300">
-                                Energy Release: {getEnergyJoules(labState.mag)}
-                             </div>
+                        {/* Sliders */}
+                        <div className="space-y-6 bg-slate-900/50 p-4 border border-slate-800">
+                            <div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <div className="flex items-center gap-2 text-purple-400">
+                                        <Zap className="w-4 h-4" />
+                                        <span className="text-xs font-bold uppercase tracking-wider">Magnitude</span>
+                                    </div>
+                                    <span className="font-mono text-xl font-bold text-white">{labState.mag.toFixed(1)}</span>
+                                </div>
+                                <input 
+                                    type="range" 
+                                    min="1" 
+                                    max="10" 
+                                    step="0.1"
+                                    value={labState.mag}
+                                    onChange={(e) => onLabStateChange({...labState, mag: parseFloat(e.target.value)})}
+                                    className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500 hover:accent-purple-400"
+                                />
+                                <div className="flex justify-between text-[9px] text-slate-500 font-mono mt-1">
+                                    <span>1.0</span>
+                                    <span>10.0</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <div className="flex items-center gap-2 text-blue-400">
+                                        <Layers className="w-4 h-4" />
+                                        <span className="text-xs font-bold uppercase tracking-wider">Depth (KM)</span>
+                                    </div>
+                                    <span className="font-mono text-xl font-bold text-white">{labState.depth} km</span>
+                                </div>
+                                <input 
+                                    type="range" 
+                                    min="0" 
+                                    max="700" 
+                                    step="10"
+                                    value={labState.depth}
+                                    onChange={(e) => onLabStateChange({...labState, depth: parseInt(e.target.value)})}
+                                    className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400"
+                                />
+                                <div className="flex justify-between text-[9px] text-slate-500 font-mono mt-1">
+                                    <span>0 km (Surface)</span>
+                                    <span>700 km (Deep)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Output Card */}
+                        <div className="bg-purple-950/20 border border-purple-500/30 p-4 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-purple-500/50"></div>
+                            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-purple-500/50"></div>
+                            
+                            <h4 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-4">TNT Equivalence</h4>
+                            
+                            <div className="text-center space-y-2">
+                                 <div className="text-xl md:text-2xl font-bold text-white font-mono leading-tight drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]">
+                                    {getTNTEquivalent(labState.mag)}
+                                 </div>
+                                 <div className="text-xs font-mono text-purple-300">
+                                    Energy Release: {getEnergyJoules(labState.mag)}
+                                 </div>
+                            </div>
+                        </div>
+
+                        <div className="text-xs text-slate-400 leading-relaxed font-mono p-3 bg-slate-900 border-l-2 border-slate-700">
+                            <strong className="text-slate-200">NOTE:</strong> As depth increases, the seismic waves attenuate (weaken) before reaching the surface. This causes the "Felt Radius" to shrink, even though the total energy release remains the same.
                         </div>
                     </div>
+                    ) : (
+                    <div className="space-y-6 animate-fadeIn">
+                        <p className="text-blue-400 font-mono text-xs leading-relaxed">
+                            Simulate P-Wave and S-Wave propagation to understand the delay between the initial jolt and heavy shaking.
+                        </p>
 
-                    {/* Educational Note */}
-                    <div className="text-xs text-slate-400 leading-relaxed font-mono p-3 bg-slate-900 border-l-2 border-slate-700">
-                        <strong className="text-slate-200">NOTE:</strong> As depth increases, the seismic waves attenuate (weaken) before reaching the surface. This causes the "Felt Radius" to shrink, even though the total energy release remains the same.
+                        {/* Steps */}
+                        <div className="space-y-2">
+                             <div className={`p-3 border rounded-md flex items-center gap-3 transition-colors ${!waveSim.station ? 'bg-blue-900/30 border-blue-500 text-blue-100 animate-pulse' : 'bg-slate-900 border-slate-700 text-slate-500'}`}>
+                                 <div className="bg-blue-500 text-white w-6 h-6 flex items-center justify-center font-bold rounded-sm text-xs">1</div>
+                                 <div className="text-xs font-mono uppercase tracking-wide">
+                                     {!waveSim.station ? 'Click Map to Place Seismometer' : 'Station Deployed'}
+                                 </div>
+                                 {!waveSim.station && <MousePointer2 className="w-4 h-4 ml-auto" />}
+                             </div>
+                             
+                             <div className={`p-3 border rounded-md flex items-center gap-3 transition-colors ${waveSim.station && !waveSim.epicenter ? 'bg-red-900/30 border-red-500 text-red-100 animate-pulse' : 'bg-slate-900 border-slate-700 text-slate-500'}`}>
+                                 <div className="bg-red-500 text-white w-6 h-6 flex items-center justify-center font-bold rounded-sm text-xs">2</div>
+                                 <div className="text-xs font-mono uppercase tracking-wide">
+                                     {!waveSim.epicenter ? 'Click Map to Trigger Quake' : 'Epicenter Designated'}
+                                 </div>
+                                 {waveSim.station && !waveSim.epicenter && <Target className="w-4 h-4 ml-auto" />}
+                             </div>
+                        </div>
+
+                        {/* Telemetry Panel */}
+                        {waveStats && (
+                            <div className="bg-slate-900 border border-slate-700 p-4 space-y-4 font-mono">
+                                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                                    <span className="text-xs text-slate-500 uppercase">Distance</span>
+                                    <span className="text-sm font-bold text-white">{Math.round(waveStats.dist)} km</span>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-4">
+                                     <div>
+                                         <div className="text-[10px] text-yellow-500 uppercase tracking-widest mb-1">P-Wave (Fast)</div>
+                                         <div className="text-lg font-bold text-white">{waveStats.pTime.toFixed(1)} s</div>
+                                         <div className="text-[9px] text-slate-500">Speed: ~6 km/s</div>
+                                     </div>
+                                     <div>
+                                         <div className="text-[10px] text-red-500 uppercase tracking-widest mb-1">S-Wave (Slow)</div>
+                                         <div className="text-lg font-bold text-white">{waveStats.sTime.toFixed(1)} s</div>
+                                         <div className="text-[9px] text-slate-500">Speed: ~3.5 km/s</div>
+                                     </div>
+                                </div>
+
+                                <div className="pt-2">
+                                    <div className="text-[10px] text-slate-400 uppercase text-center mb-1">Warning Time (S-P Gap)</div>
+                                    <div className="text-center text-xl font-bold text-cyan-400">
+                                        {(waveStats.sTime - waveStats.pTime).toFixed(1)} s
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Controls */}
+                        <div className="flex gap-2 pt-2">
+                            <button 
+                                onClick={onWaveReset}
+                                className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-md font-bold uppercase text-xs flex items-center gap-2 border border-slate-600 transition-colors"
+                            >
+                                <RotateCcw className="w-4 h-4" /> Reset
+                            </button>
+                            <button 
+                                onClick={onWaveStart}
+                                disabled={!waveSim.station || !waveSim.epicenter || waveSim.isRunning}
+                                className="flex-1 px-4 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white rounded-md font-bold uppercase text-xs flex items-center justify-center gap-2 transition-colors shadow-[0_0_15px_rgba(6,182,212,0.3)] disabled:shadow-none"
+                            >
+                                <Play className="w-4 h-4" /> 
+                                {waveSim.isRunning ? 'Simulating...' : 'Trigger Simulation'}
+                            </button>
+                        </div>
+                        
+                        {waveSim.isRunning && (
+                             <div className="text-center font-mono text-xs text-cyan-400 animate-pulse">
+                                 ELAPSED TIME: {waveSim.elapsedTime.toFixed(1)} s
+                             </div>
+                        )}
                     </div>
+                    )}
                 </div>
             </div>
         )}

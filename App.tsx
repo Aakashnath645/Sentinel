@@ -35,6 +35,15 @@ const playSonarPing = () => {
     }
 };
 
+interface WaveSimState {
+    station: { lat: number; lng: number } | null;
+    epicenter: { lat: number; lng: number } | null;
+    isRunning: boolean;
+    elapsedTime: number; // Simulation seconds
+    pRadius: number; // km
+    sRadius: number; // km
+}
+
 const App: React.FC = () => {
   const [earthquakes, setEarthquakes] = useState<EarthquakeFeature[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +69,16 @@ const App: React.FC = () => {
   const [currentLegendIndex, setCurrentLegendIndex] = useState(0);
 
   // Lab State
+  const [labTab, setLabTab] = useState<'impact' | 'wave'>('impact');
   const [labState, setLabState] = useState({ mag: 5.0, depth: 10 });
+  const [waveSim, setWaveSim] = useState<WaveSimState>({
+      station: null,
+      epicenter: null,
+      isRunning: false,
+      elapsedTime: 0,
+      pRadius: 0,
+      sRadius: 0
+  });
 
   const activeLegend = useMemo(() => LEGENDS[currentLegendIndex], [currentLegendIndex]);
 
@@ -125,6 +143,49 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [loadData]);
 
+  // --- WAVE SIMULATION LOOP ---
+  useEffect(() => {
+      let animationFrame: number;
+      let lastTime = performance.now();
+      const SPEED_MULTIPLIER = 10; // 1 real sec = 10 sim sec
+      const P_SPEED = 6; // km/s
+      const S_SPEED = 3.5; // km/s
+
+      const animate = (time: number) => {
+          if (!waveSim.isRunning) return;
+
+          const deltaSeconds = (time - lastTime) / 1000;
+          lastTime = time;
+
+          setWaveSim(prev => {
+              if (!prev.isRunning) return prev;
+              const newElapsed = prev.elapsedTime + (deltaSeconds * SPEED_MULTIPLIER);
+              
+              // Max radius safety break (e.g., 20,000 km)
+              if (newElapsed * S_SPEED > 20000) {
+                  return { ...prev, isRunning: false };
+              }
+
+              return {
+                  ...prev,
+                  elapsedTime: newElapsed,
+                  pRadius: newElapsed * P_SPEED,
+                  sRadius: newElapsed * S_SPEED
+              };
+          });
+
+          animationFrame = requestAnimationFrame(animate);
+      };
+
+      if (waveSim.isRunning) {
+          lastTime = performance.now();
+          animationFrame = requestAnimationFrame(animate);
+      }
+
+      return () => cancelAnimationFrame(animationFrame);
+  }, [waveSim.isRunning]);
+
+
   const filteredEarthquakes = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return earthquakes;
@@ -146,6 +207,34 @@ const App: React.FC = () => {
   const handleAnalyze = (feature: EarthquakeFeature) => {
       setModalQuake(feature);
   };
+  
+  // Handle Map Clicks for Lab Mode
+  const handleMapClick = (latlng: {lat: number, lng: number}) => {
+      if (viewMode !== 'lab' || labTab !== 'wave') return;
+
+      if (!waveSim.station) {
+          setWaveSim(prev => ({ ...prev, station: latlng }));
+      } else if (!waveSim.epicenter) {
+          setWaveSim(prev => ({ ...prev, epicenter: latlng }));
+      }
+  };
+
+  const handleLabReset = () => {
+      setWaveSim({
+          station: null,
+          epicenter: null,
+          isRunning: false,
+          elapsedTime: 0,
+          pRadius: 0,
+          sRadius: 0
+      });
+  };
+  
+  const handleLabStart = () => {
+      if (waveSim.station && waveSim.epicenter) {
+          setWaveSim(prev => ({ ...prev, isRunning: true, elapsedTime: 0, pRadius: 0, sRadius: 0 }));
+      }
+  };
 
   return (
     <div className="flex h-[100dvh] w-screen bg-[conic-gradient(at_bottom_left,_var(--tw-gradient-stops))] from-slate-950 via-slate-900 to-zinc-950 overflow-hidden relative">
@@ -165,6 +254,11 @@ const App: React.FC = () => {
             activeLegend={activeLegend}
             labState={labState}
             onLabStateChange={setLabState}
+            labTab={labTab}
+            onLabTabChange={setLabTab}
+            waveSim={waveSim}
+            onWaveReset={handleLabReset}
+            onWaveStart={handleLabStart}
         />
       </div>
 
@@ -207,6 +301,9 @@ const App: React.FC = () => {
                 viewMode={viewMode}
                 activeLegend={activeLegend}
                 labState={labState}
+                labTab={labTab}
+                waveSim={waveSim}
+                onMapClick={handleMapClick}
             />
 
             {/* Museum Controls */}
@@ -233,6 +330,11 @@ const App: React.FC = () => {
                 activeLegend={activeLegend}
                 labState={labState}
                 onLabStateChange={setLabState}
+                labTab={labTab}
+                onLabTabChange={setLabTab}
+                waveSim={waveSim}
+                onWaveReset={handleLabReset}
+                onWaveStart={handleLabStart}
             />
          </div>
       </div>
