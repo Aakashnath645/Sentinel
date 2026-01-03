@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap, AttributionControl, GeoJSON } from 'react-leaflet';
 import { EarthquakeFeature } from '../types';
 import { fetchTectonicPlates } from '../services/usgs';
-import { Activity, Radio, Cpu, Waves, ScanLine } from 'lucide-react';
+import { Activity, Radio, Waves, ScanLine } from 'lucide-react';
+import L from 'leaflet'; // Import Leaflet L for generic types if needed, though we use loose bounds array here
 
 interface MapProps {
   earthquakes: EarthquakeFeature[];
@@ -17,14 +18,64 @@ const TileLayerFixed = TileLayer as any;
 const GeoJSONFixed = GeoJSON as any;
 const PopupFixed = Popup as any;
 
+// --- GEOMETRY UTILS ---
+// Duplicate features for world wrapping (-360 and +360 longitude)
+const shiftGeoJSON = (data: any) => {
+    if (!data || !data.features) return data;
+    
+    const newFeatures: any[] = [];
+    
+    data.features.forEach((feature: any) => {
+        // Original
+        newFeatures.push(feature);
+        
+        // Right Copy (+360)
+        const right = JSON.parse(JSON.stringify(feature));
+        shiftCoords(right.geometry, 360);
+        newFeatures.push(right);
+        
+        // Left Copy (-360)
+        const left = JSON.parse(JSON.stringify(feature));
+        shiftCoords(left.geometry, -360);
+        newFeatures.push(left);
+    });
+    
+    return { ...data, features: newFeatures };
+};
+
+const shiftCoords = (geometry: any, offset: number) => {
+    if (geometry.type === 'LineString') {
+        geometry.coordinates.forEach((coord: any) => coord[0] += offset);
+    } else if (geometry.type === 'MultiLineString') {
+        geometry.coordinates.forEach((line: any) => line.forEach((coord: any) => coord[0] += offset));
+    }
+};
+
+// --- SUB-COMPONENTS ---
+
+// Handles continuous Map Resize Observation for smooth sidebar transitions
+const MapResizer: React.FC = () => {
+    const map = useMap();
+    
+    useEffect(() => {
+        const container = map.getContainer();
+        const observer = new ResizeObserver(() => {
+            map.invalidateSize();
+        });
+        
+        observer.observe(container);
+        
+        return () => {
+            observer.disconnect();
+        };
+    }, [map]);
+    
+    return null;
+};
+
 // Component to handle flying to location when selectedId changes
 const MapController: React.FC<{ selectedId: string | null; earthquakes: EarthquakeFeature[] }> = ({ selectedId, earthquakes }) => {
   const map = useMap();
-
-  useEffect(() => {
-    // Force map invalidation on mount to ensure tiles load correctly if container resized
-    map.invalidateSize();
-  }, [map]);
 
   useEffect(() => {
     if (selectedId) {
@@ -47,7 +98,11 @@ const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, 
 
   useEffect(() => {
       fetchTectonicPlates().then(data => {
-          if (data) setTectonicPlates(data);
+          if (data) {
+              // Process data to wrap around the world
+              const processed = shiftGeoJSON(data);
+              setTectonicPlates(processed);
+          }
       });
   }, []);
   
@@ -75,7 +130,10 @@ const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, 
         style={{ height: '100%', width: '100%', background: '#020617' }}
         attributionControl={false} 
         worldCopyJump={true}
+        maxBounds={[[-90, -Infinity], [90, Infinity]]} // Restrict vertical panning to the poles, allow infinite horizontal
+        maxBoundsViscosity={1.0} // Hard stop at bounds
         >
+        <MapResizer />
         <AttributionControl position="bottomright" prefix={false} />
         <TileLayerFixed
             attribution='&copy; <a href="https://carto.com/">CARTO</a>'
