@@ -13,8 +13,8 @@ interface SidebarProps {
   onSearch: (query: string) => void;
   userLocation: { lat: number; lng: number } | null;
   activeLegend: LegendEvent | null;
-  labState: { mag: number; depth: number };
-  onLabStateChange: (state: { mag: number; depth: number }) => void;
+  labState: { mag: number; depth: number; location: { lat: number; lng: number } | null };
+  onLabStateChange: (state: { mag: number; depth: number; location: { lat: number; lng: number } | null }) => void;
   labTab: 'impact' | 'wave' | 'forecast';
   onLabTabChange: (tab: 'impact' | 'wave' | 'forecast') => void;
   waveSim: {
@@ -658,6 +658,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                         
                         {/* Sliders */}
                         <div className="space-y-6 bg-slate-900/50 p-4 border border-slate-800">
+                             {/* Location Status */}
+                             <div className={`p-3 border rounded-md flex items-center gap-3 transition-colors ${!labState.location ? 'bg-purple-900/30 border-purple-500 text-purple-100 animate-pulse' : 'bg-slate-900 border-slate-700 text-slate-500'}`}>
+                                 <MousePointer2 className="w-4 h-4" />
+                                 <div className="text-xs font-mono uppercase tracking-wide">
+                                     {!labState.location ? 'Click Map to set Ground Zero' : `Target: ${labState.location.lat.toFixed(2)}, ${labState.location.lng.toFixed(2)}`}
+                                 </div>
+                             </div>
+
                             <div>
                                 <div className="flex justify-between items-center mb-2">
                                     <div className="flex items-center gap-2 text-purple-400">
@@ -764,12 +772,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 <div className="grid grid-cols-2 gap-4">
                                      <div>
                                          <div className="text-[10px] text-yellow-500 uppercase tracking-widest mb-1">P-Wave (Fast)</div>
-                                         <div className="text-lg font-bold text-white">{waveStats.pTime.toFixed(1)} s</div>
+                                         <div className={`text-lg font-bold transition-colors ${waveSim.elapsedTime >= waveStats.pTime ? 'text-yellow-400 animate-pulse' : 'text-white'}`}>{waveStats.pTime.toFixed(1)} s</div>
                                          <div className="text-[9px] text-slate-500">Speed: ~6 km/s</div>
                                      </div>
                                      <div>
                                          <div className="text-[10px] text-red-500 uppercase tracking-widest mb-1">S-Wave (Slow)</div>
-                                         <div className="text-lg font-bold text-white">{waveStats.sTime.toFixed(1)} s</div>
+                                         <div className={`text-lg font-bold transition-colors ${waveSim.elapsedTime >= waveStats.sTime ? 'text-red-400 animate-pulse' : 'text-white'}`}>{waveStats.sTime.toFixed(1)} s</div>
                                          <div className="text-[9px] text-slate-500">Speed: ~3.5 km/s</div>
                                      </div>
                                 </div>

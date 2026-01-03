@@ -44,6 +44,12 @@ interface WaveSimState {
     sRadius: number; // km
 }
 
+interface LabState {
+    mag: number;
+    depth: number;
+    location: { lat: number; lng: number } | null;
+}
+
 const App: React.FC = () => {
   const [earthquakes, setEarthquakes] = useState<EarthquakeFeature[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +76,7 @@ const App: React.FC = () => {
 
   // Lab State
   const [labTab, setLabTab] = useState<'impact' | 'wave' | 'forecast'>('impact');
-  const [labState, setLabState] = useState({ mag: 5.0, depth: 10 });
+  const [labState, setLabState] = useState<LabState>({ mag: 5.0, depth: 10, location: null });
   const [waveSim, setWaveSim] = useState<WaveSimState>({
       station: null,
       epicenter: null,
@@ -210,12 +216,16 @@ const App: React.FC = () => {
   
   // Handle Map Clicks for Lab Mode
   const handleMapClick = (latlng: {lat: number, lng: number}) => {
-      if (viewMode !== 'lab' || labTab !== 'wave') return;
+      if (viewMode !== 'lab') return;
 
-      if (!waveSim.station) {
-          setWaveSim(prev => ({ ...prev, station: latlng }));
-      } else if (!waveSim.epicenter) {
-          setWaveSim(prev => ({ ...prev, epicenter: latlng }));
+      if (labTab === 'impact') {
+           setLabState(prev => ({ ...prev, location: latlng }));
+      } else if (labTab === 'wave') {
+          if (!waveSim.station) {
+              setWaveSim(prev => ({ ...prev, station: latlng }));
+          } else if (!waveSim.epicenter) {
+              setWaveSim(prev => ({ ...prev, epicenter: latlng }));
+          }
       }
   };
 

@@ -12,7 +12,7 @@ interface MapProps {
   onAnalyze: (feature: EarthquakeFeature) => void;
   viewMode: 'live' | 'museum' | 'lab' | 'protocols';
   activeLegend: LegendEvent | null;
-  labState: { mag: number; depth: number };
+  labState: { mag: number; depth: number; location: { lat: number; lng: number } | null };
   labTab: 'impact' | 'wave' | 'forecast';
   waveSim: {
       station: { lat: number; lng: number } | null;
@@ -47,6 +47,13 @@ const stationIcon = L.divIcon({
 const epicenterIcon = L.divIcon({
     className: 'custom-div-icon',
     html: `<div style="background-color: #ef4444; width: 16px; height: 16px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 15px #ef4444;" class="animate-pulse"></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8]
+});
+
+const groundZeroIcon = L.divIcon({
+    className: 'custom-div-icon',
+    html: `<div style="background-color: #a855f7; width: 16px; height: 16px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 15px #a855f7;" class="animate-pulse"></div>`,
     iconSize: [16, 16],
     iconAnchor: [8, 8]
 });
@@ -139,9 +146,6 @@ const EarthquakeMap: React.FC<MapProps> = ({
 }) => {
   const [tectonicPlates, setTectonicPlates] = useState<any>(null);
   
-  // Lab Test Site Coordinates (Middle of Pacific)
-  const LAB_IMPACT_COORDS: [number, number] = [0, -160];
-
   useEffect(() => {
       fetchTectonicPlates().then(data => {
           if (data) {
@@ -175,7 +179,7 @@ const EarthquakeMap: React.FC<MapProps> = ({
         zoom={2.5}
         minZoom={2}
         className="w-full h-full z-0 bg-black"
-        style={{ height: '100%', width: '100%', background: '#020617', cursor: viewMode === 'lab' && labTab === 'wave' ? 'crosshair' : 'grab' }}
+        style={{ height: '100%', width: '100%', background: '#020617', cursor: viewMode === 'lab' && (labTab === 'wave' || labTab === 'impact') ? 'crosshair' : 'grab' }}
         attributionControl={false} 
         worldCopyJump={true}
         maxBounds={[[-90, -Infinity], [90, Infinity]]}
@@ -325,10 +329,11 @@ const EarthquakeMap: React.FC<MapProps> = ({
         )}
         
         {/* LAB: IMPACT SIMULATION */}
-        {viewMode === 'lab' && labTab === 'impact' && (
+        {viewMode === 'lab' && labTab === 'impact' && labState.location && (
             <React.Fragment>
+                <Marker position={labState.location} icon={groundZeroIcon} />
                 <Circle 
-                    center={LAB_IMPACT_COORDS}
+                    center={labState.location}
                     radius={getLabImpactRadius(labState.mag, labState.depth)} 
                     pathOptions={{
                         color: '#a855f7', 
@@ -340,7 +345,7 @@ const EarthquakeMap: React.FC<MapProps> = ({
                     }}
                 />
                 <CircleMarker
-                    center={LAB_IMPACT_COORDS}
+                    center={labState.location}
                     radius={10}
                     pathOptions={{
                         color: '#fff',
@@ -369,7 +374,7 @@ const EarthquakeMap: React.FC<MapProps> = ({
                      </PopupFixed>
                 </CircleMarker>
                 <CircleMarker
-                    center={LAB_IMPACT_COORDS}
+                    center={labState.location}
                     radius={30}
                     pathOptions={{ color: '#a855f7', weight: 1, fill: false, dashArray: '2, 4' }}
                     interactive={false}
