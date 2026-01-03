@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import EarthquakeMap from './components/EarthquakeMap';
 import AnalysisModal from './components/AnalysisModal';
@@ -6,12 +6,46 @@ import { fetchEarthquakes } from './services/usgs';
 import { EarthquakeFeature, USGSGeoJSON } from './types';
 import { Loader2, AlertCircle } from 'lucide-react';
 
+// --- Sound Utility ---
+// Generates a "Sci-Fi Sonar Ping" using Web Audio API to avoid external assets
+const playSonarPing = () => {
+    try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContext) return;
+        
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        // Sonar Tone: High pitched Sine wave with a distinct ping envelope
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1200, ctx.currentTime);
+        
+        // Envelope: Sharp attack, long smooth decay
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.05); // Attack
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5); // Decay
+
+        osc.start();
+        osc.stop(ctx.currentTime + 1.5);
+    } catch (e) {
+        console.error("Audio play failed", e);
+    }
+};
+
 const App: React.FC = () => {
   const [earthquakes, setEarthquakes] = useState<EarthquakeFeature[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   
+  // Audio Alert State Refs
+  const previousIdsRef = useRef<Set<string>>(new Set());
+  const isInitialLoadRef = useRef(true);
+
   // Selection State
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,6 +59,26 @@ const App: React.FC = () => {
       if (!isSilent) setLoading(true);
       
       const data: USGSGeoJSON = await fetchEarthquakes();
+      
+      // Check for new major earthquakes (Mag >= 5.0) for audio alert
+      // We only run this check if it is NOT the initial load
+      if (!isInitialLoadRef.current) {
+          const newMajorQuakes = data.features.filter(f => {
+              const isMajor = f.properties.mag >= 5.0;
+              const isNew = !previousIdsRef.current.has(f.id);
+              return isMajor && isNew;
+          });
+
+          if (newMajorQuakes.length > 0) {
+              playSonarPing();
+          }
+      }
+
+      // Update refs
+      const currentIds = new Set(data.features.map(f => f.id));
+      previousIdsRef.current = currentIds;
+      isInitialLoadRef.current = false;
+
       // Ensure sorted by time descending
       const sorted = data.features.sort((a, b) => b.properties.time - a.properties.time);
       
