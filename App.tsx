@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import EarthquakeMap from './components/EarthquakeMap';
 import AnalysisModal from './components/AnalysisModal';
@@ -14,34 +14,60 @@ const App: React.FC = () => {
   
   // Selection State
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Modal State
   const [modalQuake, setModalQuake] = useState<EarthquakeFeature | null>(null);
 
-  const loadData = useCallback(async () => {
+  // Define loadData with NO dependencies on 'earthquakes' state to prevent infinite loops
+  const loadData = useCallback(async (isSilent = false) => {
     try {
-      // Don't set loading true on refresh to keep UI smooth, only on initial load if needed
-      if (earthquakes.length === 0) setLoading(true);
+      if (!isSilent) setLoading(true);
       
       const data: USGSGeoJSON = await fetchEarthquakes();
-      // Ensure sorted by time descending (API usually does this, but to be safe)
+      // Ensure sorted by time descending
       const sorted = data.features.sort((a, b) => b.properties.time - a.properties.time);
+      
       setEarthquakes(sorted);
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
+      console.error("Data load failed:", err);
       setError("Failed to connect to seismic sensor network.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
-  }, [earthquakes.length]);
+  }, []);
 
   // Initial fetch and Poll
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 60000); // 60s
+    // Initial load (shows spinner)
+    loadData(false);
+    
+    // Background polling every 60s (no spinner)
+    const interval = setInterval(() => {
+        loadData(true);
+    }, 60000);
+    
     return () => clearInterval(interval);
   }, [loadData]);
+
+  // Filter Logic
+  const filteredEarthquakes = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return earthquakes;
+
+    // Check for magnitude filter pattern (e.g. ">5", "m5", "5+")
+    const magMatch = query.match(/^(?:>|>=|m)\s*(\d+(?:\.\d+)?)\+?$/);
+    
+    if (magMatch) {
+      const minMag = parseFloat(magMatch[1]);
+      return earthquakes.filter(q => q.properties.mag >= minMag);
+    }
+
+    // Default: Filter by location name
+    return earthquakes.filter(q => q.properties.place.toLowerCase().includes(query));
+  }, [earthquakes, searchQuery]);
 
   const handleSelect = (id: string, feature: EarthquakeFeature) => {
     setSelectedId(id);
@@ -52,55 +78,64 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-screen bg-slate-950 overflow-hidden relative">
+    <div className="flex h-[100dvh] w-screen bg-[conic-gradient(at_bottom_left,_var(--tw-gradient-stops))] from-slate-950 via-slate-900 to-zinc-950 overflow-hidden relative">
       
       {/* Mobile Drawer / Desktop Sidebar */}
-      <div className="hidden md:block h-full z-20">
+      <div className="hidden md:block h-full z-20 shadow-[5px_0_30px_rgba(0,0,0,0.5)]">
         <Sidebar 
-            earthquakes={earthquakes} 
+            earthquakes={filteredEarthquakes} 
             onSelect={handleSelect} 
             selectedId={selectedId}
             lastUpdated={lastUpdated}
+            searchQuery={searchQuery}
+            onSearch={setSearchQuery}
         />
       </div>
 
       {/* Main Map Area */}
-      <div className="flex-1 relative h-full">
-         {/* Loading Overlay */}
-         {loading && (
-             <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
-                 <div className="flex flex-col items-center gap-4">
-                     <Loader2 className="w-12 h-12 text-teal-400 animate-spin" />
-                     <span className="text-teal-400 font-mono tracking-widest animate-pulse">INITIALIZING SENSORS...</span>
-                 </div>
-             </div>
-         )}
-         
-         {/* Error Toast */}
-         {error && (
-             <div className="absolute top-4 right-4 z-50 bg-red-900/90 text-red-100 p-4 rounded border border-red-500 flex items-center gap-3 shadow-xl">
-                 <AlertCircle className="w-6 h-6" />
-                 <div>
-                     <h4 className="font-bold">Connection Error</h4>
-                     <p className="text-sm">{error}</p>
-                 </div>
-             </div>
-         )}
+      <div className="flex-1 relative h-full flex flex-col min-h-0">
+         {/* Top decorative border */}
+         <div className="h-1 bg-gradient-to-r from-cyan-900/0 via-cyan-500/50 to-cyan-900/0 w-full z-10 flex-none" />
 
-         <EarthquakeMap 
-            earthquakes={earthquakes} 
-            selectedId={selectedId}
-            onSelect={handleSelect}
-            onAnalyze={handleAnalyze}
-         />
+         <div className="relative flex-1 bg-slate-950/50 min-h-0">
+             {/* Loading Overlay */}
+            {loading && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm">
+                    <div className="flex flex-col items-center gap-4">
+                        <Loader2 className="w-16 h-16 text-cyan-400 animate-spin" />
+                        <span className="text-cyan-400 font-mono tracking-[0.5em] animate-pulse text-sm">INITIALIZING SENSORS...</span>
+                    </div>
+                </div>
+            )}
+            
+            {/* Error Toast */}
+            {error && (
+                <div className="absolute top-4 right-4 z-50 bg-red-950/90 text-red-100 p-4 border border-red-500/50 flex items-center gap-3 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
+                    <AlertCircle className="w-6 h-6 text-red-500" />
+                    <div>
+                        <h4 className="font-bold font-mono uppercase">System Error</h4>
+                        <p className="text-xs font-mono">{error}</p>
+                    </div>
+                </div>
+            )}
+
+            <EarthquakeMap 
+                earthquakes={filteredEarthquakes} 
+                selectedId={selectedId}
+                onSelect={handleSelect}
+                onAnalyze={handleAnalyze}
+            />
+         </div>
 
          {/* Mobile Bottom Sheet (Simplified) */}
-         <div className="md:hidden absolute bottom-0 left-0 right-0 h-1/3 bg-slate-900 z-20 border-t border-slate-700">
+         <div className="md:hidden absolute bottom-0 left-0 right-0 h-1/3 bg-slate-900 z-20 border-t border-cyan-500/30">
              <Sidebar 
-                earthquakes={earthquakes} 
+                earthquakes={filteredEarthquakes} 
                 onSelect={handleSelect} 
                 selectedId={selectedId}
                 lastUpdated={lastUpdated}
+                searchQuery={searchQuery}
+                onSearch={setSearchQuery}
             />
          </div>
       </div>

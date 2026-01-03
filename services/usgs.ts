@@ -4,9 +4,11 @@ const USGS_FEED_URL = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary
 
 export const fetchEarthquakes = async (): Promise<USGSGeoJSON> => {
   try {
-    const response = await fetch(USGS_FEED_URL);
+    // Add a timestamp to prevent aggressive browser caching
+    const response = await fetch(`${USGS_FEED_URL}?t=${Date.now()}`);
+    
     if (!response.ok) {
-      throw new Error(`Failed to fetch USGS data: ${response.statusText}`);
+      throw new Error(`Status: ${response.status} ${response.statusText}`);
     }
     const data: USGSGeoJSON = await response.json();
     return data;
