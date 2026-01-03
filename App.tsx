@@ -65,7 +65,7 @@ const App: React.FC = () => {
   const [modalQuake, setModalQuake] = useState<EarthquakeFeature | null>(null);
 
   // View Mode State
-  const [viewMode, setViewMode] = useState<'live' | 'museum' | 'lab'>('live');
+  const [viewMode, setViewMode] = useState<'live' | 'museum' | 'lab' | 'protocols'>('live');
   const [currentLegendIndex, setCurrentLegendIndex] = useState(0);
 
   // Lab State
@@ -268,7 +268,8 @@ const App: React.FC = () => {
          <div className={`h-1 w-full z-10 flex-none transition-colors duration-500 ${
              viewMode === 'live' ? 'bg-gradient-to-r from-cyan-900/0 via-cyan-500/50 to-cyan-900/0' 
              : viewMode === 'museum' ? 'bg-gradient-to-r from-red-900/0 via-red-500/50 to-red-900/0'
-             : 'bg-gradient-to-r from-purple-900/0 via-purple-500/50 to-purple-900/0'
+             : viewMode === 'lab' ? 'bg-gradient-to-r from-purple-900/0 via-purple-500/50 to-purple-900/0'
+             : 'bg-gradient-to-r from-green-900/0 via-green-500/50 to-green-900/0'
          }`} />
 
          <div className="relative flex-1 bg-slate-950/50 min-h-0">

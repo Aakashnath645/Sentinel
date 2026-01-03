@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { EarthquakeFeature, LegendEvent } from '../types';
-import { Activity, Radio, Clock, MapPin, Search, Database, BarChart3, Wifi, Waves, Navigation, AlertTriangle, PanelLeftClose, PanelLeftOpen, Landmark, Skull, Beaker, Zap, Layers, Play, RotateCcw, Target, MousePointer2 } from 'lucide-react';
+import { Activity, Radio, Clock, MapPin, Search, Database, BarChart3, Wifi, Waves, Navigation, AlertTriangle, PanelLeftClose, PanelLeftOpen, Landmark, Skull, Beaker, Zap, Layers, Play, RotateCcw, Target, MousePointer2, ClipboardCheck, ShieldAlert, CheckSquare, Siren, Hammer, ChevronRight } from 'lucide-react';
 
 interface SidebarProps {
-  viewMode: 'live' | 'museum' | 'lab';
-  onViewModeChange: (mode: 'live' | 'museum' | 'lab') => void;
+  viewMode: 'live' | 'museum' | 'lab' | 'protocols';
+  onViewModeChange: (mode: 'live' | 'museum' | 'lab' | 'protocols') => void;
   earthquakes: EarthquakeFeature[];
   onSelect: (id: string, feature: EarthquakeFeature) => void;
   selectedId: string | null;
@@ -27,6 +27,21 @@ interface SidebarProps {
   onWaveStart: () => void;
 }
 
+const GO_BAG_ITEMS = [
+    { id: 'water', label: 'Water (1 gal/person/day)' },
+    { id: 'food', label: 'Non-perishable Food (3 days)' },
+    { id: 'flashlight', label: 'Flashlight + Extra Batteries' },
+    { id: 'firstaid', label: 'First Aid Kit' },
+    { id: 'whistle', label: 'Whistle (Signal for help)' },
+    { id: 'mask', label: 'Dust Mask (N95)' },
+    { id: 'wipes', label: 'Moist Towelettes / Garbage Bags' },
+    { id: 'wrench', label: 'Wrench/Pliers (Utilities)' },
+    { id: 'canopener', label: 'Manual Can Opener' },
+    { id: 'maps', label: 'Local Maps (Paper)' },
+    { id: 'powerbank', label: 'Portable Power Bank' },
+    { id: 'radio', label: 'Hand-crank / Battery Radio' }
+];
+
 const Sidebar: React.FC<SidebarProps> = ({ 
     viewMode,
     onViewModeChange,
@@ -48,6 +63,35 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [sortBy, setSortBy] = useState<'time' | 'distance'>('time');
   const [isCollapsed, setIsCollapsed] = useState(false);
+  
+  // Protocols State
+  const [protocolTab, setProtocolTab] = useState<'during' | 'after' | 'tsunami'>('during');
+  const [checklist, setChecklist] = useState<Record<string, boolean>>({});
+
+  // Load Checklist from LocalStorage
+  useEffect(() => {
+      const saved = localStorage.getItem('sentinel_gobag');
+      if (saved) {
+          try {
+              setChecklist(JSON.parse(saved));
+          } catch (e) {
+              console.error("Failed to parse checklist", e);
+          }
+      }
+  }, []);
+
+  // Save Checklist
+  const toggleCheckItem = (id: string) => {
+      const updated = { ...checklist, [id]: !checklist[id] };
+      setChecklist(updated);
+      localStorage.setItem('sentinel_gobag', JSON.stringify(updated));
+  };
+
+  const checklistProgress = useMemo(() => {
+      const total = GO_BAG_ITEMS.length;
+      const checked = GO_BAG_ITEMS.filter(i => checklist[i.id]).length;
+      return Math.round((checked / total) * 100);
+  }, [checklist]);
 
   // Stats Calculation
   const totalEvents = earthquakes.length;
@@ -148,58 +192,129 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   }, [earthquakes, userLocation, sortBy]);
 
+  // --- RENDER HELPERS ---
+  const NavButton = ({ id, icon: Icon, color, label }: { id: typeof viewMode, icon: any, color: string, label: string }) => {
+      const active = viewMode === id;
+      
+      // Dynamic class mapping for Tailwind JIT
+      let activeClasses = "";
+      let indicatorColor = "";
+      
+      if (color === "cyan") {
+          activeClasses = "bg-cyan-900/30 text-cyan-400 border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.3)]";
+          indicatorColor = "bg-cyan-500";
+      } else if (color === "red") {
+          activeClasses = "bg-red-900/30 text-red-400 border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.3)]";
+          indicatorColor = "bg-red-500";
+      } else if (color === "purple") {
+          activeClasses = "bg-purple-900/30 text-purple-400 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)]";
+          indicatorColor = "bg-purple-500";
+      } else if (color === "green") {
+          activeClasses = "bg-green-900/30 text-green-400 border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.3)]";
+          indicatorColor = "bg-green-500";
+      }
+
+      return (
+        <button
+            onClick={() => onViewModeChange(id)}
+            className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 relative group border ${
+                active 
+                ? activeClasses
+                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800 border-transparent'
+            }`}
+        >
+            <Icon className="w-5 h-5" />
+            
+            {/* Active Indicator Bar */}
+            {active && (
+                <div className={`absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full ${indicatorColor}`}></div>
+            )}
+
+            {/* Tooltip */}
+            <div className="absolute left-full ml-3 px-2 py-1 bg-slate-900 border border-slate-700 text-[10px] font-bold font-mono uppercase text-slate-200 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity translate-x-1 group-hover:translate-x-0">
+                {label}
+            </div>
+        </button>
+      );
+  };
+
   return (
     <div 
-        className={`flex flex-col h-full bg-slate-950 border-r border-slate-800/80 relative transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] overflow-hidden w-full ${
-            isCollapsed ? 'md:w-[60px]' : 'md:w-[450px]'
+        className={`flex flex-col md:flex-row h-full bg-slate-950 border-r border-slate-800/80 relative transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] w-full ${
+            isCollapsed ? 'md:w-[64px]' : 'md:w-[450px]'
         }`}
     >
       <div className="absolute inset-0 bg-grid pointer-events-none opacity-20"></div>
 
-      <button 
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute right-3 top-3 z-50 p-1.5 text-cyan-500 hover:text-cyan-300 hover:bg-cyan-900/30 rounded-sm transition-colors hidden md:flex items-center justify-center border border-transparent hover:border-cyan-500/30"
-        title={isCollapsed ? "Expand Sidebar" : "Minimize Sidebar"}
-      >
-        {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-      </button>
+      {/* --- DESKTOP NAVIGATION RAIL --- */}
+      <div className="hidden md:flex flex-col items-center py-4 gap-6 w-[64px] border-r border-slate-800 bg-slate-950 z-50 flex-none">
+          {/* Logo */}
+          <div className="w-10 h-10 rounded-full bg-cyan-900/20 border border-cyan-500/50 flex items-center justify-center text-cyan-400 mb-2 relative group cursor-default">
+              <Radio className="w-5 h-5" />
+              <span className="absolute inset-0 rounded-full border border-cyan-400 opacity-50 animate-ping"></span>
+          </div>
 
-      <div 
-        className={`flex-1 flex flex-col h-full w-full md:w-[450px] transition-opacity duration-200 ${
-            isCollapsed ? 'opacity-0 pointer-events-none invisible' : 'opacity-100 visible'
-        }`}
-      >
-        {/* Top Navigation Tabs */}
-        <div className="flex border-b border-slate-800">
+          <div className="flex flex-col gap-3 w-full items-center">
+              <NavButton id="live" icon={Wifi} color="cyan" label="Live Feed" />
+              <NavButton id="museum" icon={Landmark} color="red" label="Archive" />
+              <NavButton id="lab" icon={Beaker} color="purple" label="Sim Lab" />
+              <NavButton id="protocols" icon={ShieldAlert} color="green" label="Protocols" />
+          </div>
+
+          <div className="mt-auto">
+             <button 
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-cyan-400 transition-colors"
+                title={isCollapsed ? "Expand Panel" : "Collapse Panel"}
+             >
+                {isCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+             </button>
+          </div>
+      </div>
+
+      {/* --- MOBILE NAVIGATION TABS (Visible only on small screens) --- */}
+      <div className="md:hidden flex border-b border-slate-800 flex-none">
              <button 
                 onClick={() => onViewModeChange('live')}
-                className={`flex-1 py-3 text-[10px] md:text-xs font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
-                    viewMode === 'live' ? 'bg-slate-900 text-cyan-400 border-b-2 border-cyan-400' : 'bg-slate-950 text-slate-500 hover:text-slate-300'
+                className={`flex-1 py-3 text-[10px] font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
+                    viewMode === 'live' ? 'bg-slate-900 text-cyan-400 border-b-2 border-cyan-400' : 'bg-slate-950 text-slate-500'
                 }`}
              >
-                 <Wifi className="w-3 h-3" />
-                 Live
+                 <Wifi className="w-3 h-3" /> Live
              </button>
              <button 
                 onClick={() => onViewModeChange('museum')}
-                className={`flex-1 py-3 text-[10px] md:text-xs font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
-                    viewMode === 'museum' ? 'bg-slate-900 text-red-400 border-b-2 border-red-500' : 'bg-slate-950 text-slate-500 hover:text-slate-300'
+                className={`flex-1 py-3 text-[10px] font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
+                    viewMode === 'museum' ? 'bg-slate-900 text-red-400 border-b-2 border-red-500' : 'bg-slate-950 text-slate-500'
                 }`}
              >
-                 <Landmark className="w-3 h-3" />
-                 Museum
+                 <Landmark className="w-3 h-3" /> Museum
              </button>
              <button 
                 onClick={() => onViewModeChange('lab')}
-                className={`flex-1 py-3 text-[10px] md:text-xs font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
-                    viewMode === 'lab' ? 'bg-slate-900 text-purple-400 border-b-2 border-purple-500' : 'bg-slate-950 text-slate-500 hover:text-slate-300'
+                className={`flex-1 py-3 text-[10px] font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
+                    viewMode === 'lab' ? 'bg-slate-900 text-purple-400 border-b-2 border-purple-500' : 'bg-slate-950 text-slate-500'
                 }`}
              >
-                 <Beaker className="w-3 h-3" />
-                 Lab
+                 <Beaker className="w-3 h-3" /> Lab
              </button>
-        </div>
+             <button 
+                onClick={() => onViewModeChange('protocols')}
+                className={`flex-1 py-3 text-[10px] font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
+                    viewMode === 'protocols' ? 'bg-slate-900 text-green-400 border-b-2 border-green-500' : 'bg-slate-950 text-slate-500'
+                }`}
+             >
+                 <ShieldAlert className="w-3 h-3" /> Kit
+             </button>
+      </div>
 
+      {/* --- CONTENT DRAWER --- */}
+      <div 
+        className={`flex-1 flex flex-col h-full bg-slate-950/95 overflow-hidden transition-all duration-300 relative ${
+            isCollapsed ? 'md:w-0 md:opacity-0 pointer-events-none' : 'md:w-auto opacity-100'
+        }`}
+      >
+        
         {viewMode === 'live' && (
         <>
             <div className="flex-none px-6 py-6 border-b border-cyan-900/30 bg-slate-900/80 relative overflow-hidden">
@@ -207,9 +322,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <div className="relative z-10">
                     <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                        <div className="relative flex items-center justify-center w-8 h-8 rounded-full border border-cyan-500/50 bg-cyan-900/20">
+                        {/* Mobile Logo Only (Desktop is in Rail) */}
+                        <div className="md:hidden relative flex items-center justify-center w-8 h-8 rounded-full border border-cyan-500/50 bg-cyan-900/20">
                             <Radio className="w-5 h-5 text-cyan-400" />
-                            <span className="absolute inset-0 rounded-full border border-cyan-400 opacity-50 animate-ping"></span>
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold tracking-[0.2em] text-cyan-50 font-mono leading-none">SENTINEL</h1>
@@ -624,38 +739,171 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
             </div>
         )}
+
+        {viewMode === 'protocols' && (
+            <div className="flex-1 overflow-y-auto bg-slate-950/80 p-6 flex flex-col relative animate-fadeIn">
+                 <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                     <ShieldAlert className="w-48 h-48 text-green-500" />
+                </div>
+
+                <div className="relative z-10 space-y-8">
+                     {/* Header */}
+                     <div>
+                        <div className="flex items-center gap-2 text-green-500 mb-2">
+                            <ShieldAlert className="w-4 h-4" />
+                            <span className="text-[10px] font-bold tracking-[0.3em] uppercase">Emergency Protocols</span>
+                        </div>
+                        <h2 className="text-2xl font-bold text-white font-mono leading-tight">PREPAREDNESS KIT</h2>
+                        
+                        {/* Progress Bar */}
+                        <div className="mt-4">
+                            <div className="flex justify-between items-end mb-1">
+                                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">Readiness Level</span>
+                                <span className={`font-mono font-bold ${checklistProgress === 100 ? 'text-green-400' : 'text-slate-200'}`}>
+                                    {checklistProgress}%
+                                </span>
+                            </div>
+                            <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div 
+                                    className={`h-full transition-all duration-500 ${checklistProgress === 100 ? 'bg-green-500' : 'bg-green-600/50'}`}
+                                    style={{ width: `${checklistProgress}%` }}
+                                ></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Go-Bag Checklist */}
+                    <div className="bg-slate-900/50 border border-slate-700 p-4">
+                        <div className="flex items-center gap-2 mb-4 text-slate-400">
+                             <CheckSquare className="w-4 h-4" />
+                             <h3 className="text-xs font-bold uppercase tracking-widest">Go-Bag Diagnostic</h3>
+                        </div>
+                        <div className="space-y-1">
+                            {GO_BAG_ITEMS.map((item) => {
+                                const isChecked = !!checklist[item.id];
+                                return (
+                                    <div 
+                                        key={item.id}
+                                        onClick={() => toggleCheckItem(item.id)}
+                                        className={`flex items-center gap-3 p-2 cursor-pointer border border-transparent hover:bg-slate-800/50 transition-colors group ${isChecked ? 'text-green-100' : 'text-slate-500'}`}
+                                    >
+                                        <div className={`font-mono text-xs font-bold ${isChecked ? 'text-green-500' : 'text-slate-700'}`}>
+                                            [{isChecked ? ' OK ' : ' -- '}]
+                                        </div>
+                                        <div className="text-xs font-medium flex-1">{item.label}</div>
+                                        {isChecked && <CheckSquare className="w-3 h-3 text-green-500 opacity-50" />}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Emergency Guide Tabs */}
+                    <div>
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <Siren className="w-4 h-4" /> Emergency Action Guide
+                        </h3>
+                        
+                        <div className="flex border border-slate-800 rounded-t-lg bg-slate-900/50">
+                             <button
+                                onClick={() => setProtocolTab('during')}
+                                className={`flex-1 py-2 text-[10px] font-bold uppercase transition-all ${protocolTab === 'during' ? 'bg-slate-800 text-white border-b-2 border-red-500' : 'text-slate-500 hover:text-slate-300'}`}
+                             >
+                                During
+                             </button>
+                             <button
+                                onClick={() => setProtocolTab('after')}
+                                className={`flex-1 py-2 text-[10px] font-bold uppercase transition-all ${protocolTab === 'after' ? 'bg-slate-800 text-white border-b-2 border-yellow-500' : 'text-slate-500 hover:text-slate-300'}`}
+                             >
+                                After
+                             </button>
+                             <button
+                                onClick={() => setProtocolTab('tsunami')}
+                                className={`flex-1 py-2 text-[10px] font-bold uppercase transition-all ${protocolTab === 'tsunami' ? 'bg-slate-800 text-white border-b-2 border-cyan-500' : 'text-slate-500 hover:text-slate-300'}`}
+                             >
+                                Tsunami
+                             </button>
+                        </div>
+
+                        <div className="bg-slate-900 border border-t-0 border-slate-800 p-4 rounded-b-lg">
+                             {protocolTab === 'during' && (
+                                 <div className="space-y-4 animate-fadeIn">
+                                     <div className="flex gap-4 items-start">
+                                         <div className="w-10 h-10 bg-red-900/30 border border-red-500/50 flex items-center justify-center text-red-500 font-bold text-lg rounded">1</div>
+                                         <div>
+                                             <h4 className="text-red-400 font-bold uppercase text-sm mb-1">DROP, COVER, HOLD ON</h4>
+                                             <p className="text-xs text-slate-400 leading-relaxed">
+                                                 Drop to your hands and knees. Cover your head and neck with your arms. Hold on to any sturdy furniture until the shaking stops.
+                                             </p>
+                                         </div>
+                                     </div>
+                                     <div className="flex gap-4 items-start">
+                                         <div className="w-10 h-10 bg-slate-800 border border-slate-600 flex items-center justify-center text-slate-400 font-bold text-lg rounded">2</div>
+                                         <div>
+                                             <h4 className="text-slate-200 font-bold uppercase text-sm mb-1">STAY INDOORS</h4>
+                                             <p className="text-xs text-slate-400 leading-relaxed">
+                                                 Do not run outside. Falling debris, glass, and building facades are the greatest hazards.
+                                             </p>
+                                         </div>
+                                     </div>
+                                 </div>
+                             )}
+
+                             {protocolTab === 'after' && (
+                                 <div className="space-y-4 animate-fadeIn">
+                                     <div className="flex gap-4 items-start">
+                                         <div className="w-10 h-10 bg-yellow-900/30 border border-yellow-500/50 flex items-center justify-center text-yellow-500 font-bold text-lg rounded">
+                                             <Hammer className="w-5 h-5" />
+                                         </div>
+                                         <div>
+                                             <h4 className="text-yellow-400 font-bold uppercase text-sm mb-1">CHECK INFRASTRUCTURE</h4>
+                                             <p className="text-xs text-slate-400 leading-relaxed">
+                                                 Smell for gas. Check for electrical damage. If you suspect a leak, turn off utilities at the main valve.
+                                             </p>
+                                         </div>
+                                     </div>
+                                     <div className="flex gap-4 items-start">
+                                         <div className="w-10 h-10 bg-slate-800 border border-slate-600 flex items-center justify-center text-slate-400 font-bold text-lg rounded">!</div>
+                                         <div>
+                                             <h4 className="text-slate-200 font-bold uppercase text-sm mb-1">EXPECT AFTERSHOCKS</h4>
+                                             <p className="text-xs text-slate-400 leading-relaxed">
+                                                 Secondary shockwaves can collapse damaged structures. Stay alert and avoid elevators.
+                                             </p>
+                                         </div>
+                                     </div>
+                                 </div>
+                             )}
+
+                             {protocolTab === 'tsunami' && (
+                                 <div className="space-y-4 animate-fadeIn">
+                                     <div className="flex gap-4 items-start">
+                                         <div className="w-10 h-10 bg-cyan-900/30 border border-cyan-500/50 flex items-center justify-center text-cyan-500 font-bold text-lg rounded">
+                                             <Waves className="w-5 h-5" />
+                                         </div>
+                                         <div>
+                                             <h4 className="text-cyan-400 font-bold uppercase text-sm mb-1">GET TO HIGH GROUND</h4>
+                                             <p className="text-xs text-slate-400 leading-relaxed">
+                                                 If you are near the coast and feel strong shaking, move inland or to high ground immediately. Do not wait for an official warning.
+                                             </p>
+                                         </div>
+                                     </div>
+                                     <div className="p-3 bg-red-950/20 border border-red-500/20 text-red-300 text-[10px] font-mono">
+                                         WARNING: Tsunami waves can arrive for hours. Do not return to the coast until officials declare it safe.
+                                     </div>
+                                 </div>
+                             )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
         
         {/* Footer / Credits */}
         <div className="flex-none p-3 border-t border-slate-800 bg-slate-950 text-center">
             <p className="text-[9px] text-slate-700 font-mono tracking-widest uppercase">
-                {viewMode === 'live' ? 'USGS SEISMIC FEED // SECURE LINK' : viewMode === 'museum' ? 'HISTORICAL ARCHIVE // READ ONLY' : 'SIMULATION ENVIRONMENT // UNCLASSIFIED'}
+                {viewMode === 'live' ? 'USGS SEISMIC FEED // SECURE LINK' : viewMode === 'museum' ? 'HISTORICAL ARCHIVE // READ ONLY' : viewMode === 'lab' ? 'SIMULATION ENVIRONMENT // UNCLASSIFIED' : 'CIVIL DEFENSE PROTOCOLS'}
             </p>
         </div>
-      </div>
-
-      {/* COLLAPSED STATE PLACEHOLDER (Desktop Only) */}
-      <div 
-        className={`absolute inset-0 flex flex-col items-center py-10 gap-8 hidden md:flex transition-opacity duration-300 delay-100 ${
-             isCollapsed ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'
-        }`}
-      >
-          {/* Logo Icon */}
-          <div className="relative flex items-center justify-center w-8 h-8 rounded-full border border-cyan-500/50 bg-cyan-900/20 flex-none mt-8">
-              <Radio className="w-4 h-4 text-cyan-400" />
-              <span className="absolute inset-0 rounded-full border border-cyan-400 opacity-50 animate-ping"></span>
-          </div>
-
-          {/* Vertical Text */}
-          <div className="flex-1 flex items-center justify-center min-h-0 w-full overflow-hidden">
-               <div className="-rotate-90 whitespace-nowrap text-[10px] font-mono font-bold tracking-[0.3em] text-slate-500 flex items-center gap-4 uppercase select-none">
-                  <span className={lastUpdated ? "text-emerald-500 animate-pulse" : ""}>●</span>
-                  <span>Sentinel Array // {viewMode === 'live' ? 'Live' : viewMode === 'museum' ? 'Archive' : 'Lab'}</span>
-               </div>
-          </div>
-          
-          <div className="flex-none text-slate-700 mb-4">
-             <Wifi className="w-4 h-4" />
-          </div>
       </div>
     </div>
   );

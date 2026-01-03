@@ -10,7 +10,7 @@ interface MapProps {
   selectedId: string | null;
   onSelect: (id: string, feature: EarthquakeFeature) => void;
   onAnalyze: (feature: EarthquakeFeature) => void;
-  viewMode: 'live' | 'museum' | 'lab';
+  viewMode: 'live' | 'museum' | 'lab' | 'protocols';
   activeLegend: LegendEvent | null;
   labState: { mag: number; depth: number };
   labTab: 'impact' | 'wave';
@@ -107,7 +107,7 @@ const MapClickHandler: React.FC<{ onMapClick: (latlng: {lat: number, lng: number
 const MapController: React.FC<{ 
     selectedId: string | null; 
     earthquakes: EarthquakeFeature[];
-    viewMode: 'live' | 'museum' | 'lab';
+    viewMode: 'live' | 'museum' | 'lab' | 'protocols';
     activeLegend: LegendEvent | null;
 }> = ({ selectedId, earthquakes, viewMode, activeLegend }) => {
   const map = useMap();
@@ -126,9 +126,8 @@ const MapController: React.FC<{
             animate: true,
             duration: 2
         });
-    } else if (viewMode === 'lab') {
-        // Just ensure reasonable zoom, don't force move every time unless necessary
-        // map.flyTo([0, -160], 5, { animate: true, duration: 2 });
+    } else if (viewMode === 'protocols') {
+         map.flyTo([20, 0], 2.5, { animate: true, duration: 1.5 });
     }
   }, [selectedId, earthquakes, map, viewMode, activeLegend]);
 
