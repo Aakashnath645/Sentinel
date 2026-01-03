@@ -1,5 +1,7 @@
 {
   "name": "Sentinel - Global Seismic Monitor",
   "description": "Real-time earthquake monitoring dashboard using USGS data. Features interactive mapping, live feed updates, and AI-powered situational analysis using Google Gemini Search and Maps grounding.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "geolocation"
+  ]
 }

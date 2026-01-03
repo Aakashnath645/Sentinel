@@ -50,6 +50,9 @@ const App: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Geolocation State
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+
   // Modal State
   const [modalQuake, setModalQuake] = useState<EarthquakeFeature | null>(null);
 
@@ -93,11 +96,26 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Initial fetch and Poll
+  // Initial fetch, Poll, and Geolocation
   useEffect(() => {
     // Initial load (shows spinner)
     loadData(false);
     
+    // Get Location
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setUserLocation({
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                });
+            },
+            (error) => {
+                console.warn("Geolocation permission denied or failed", error);
+            }
+        );
+    }
+
     // Background polling every 60s (no spinner)
     const interval = setInterval(() => {
         loadData(true);
@@ -143,6 +161,7 @@ const App: React.FC = () => {
             lastUpdated={lastUpdated}
             searchQuery={searchQuery}
             onSearch={setSearchQuery}
+            userLocation={userLocation}
         />
       </div>
 
@@ -190,6 +209,7 @@ const App: React.FC = () => {
                 lastUpdated={lastUpdated}
                 searchQuery={searchQuery}
                 onSearch={setSearchQuery}
+                userLocation={userLocation}
             />
          </div>
       </div>

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap, AttributionControl, GeoJSON } from 'react-leaflet';
 import { EarthquakeFeature } from '../types';
 import { fetchTectonicPlates } from '../services/usgs';
-import { Activity, Radio, Cpu, Waves } from 'lucide-react';
+import { Activity, Radio, Cpu, Waves, ScanLine } from 'lucide-react';
 
 interface MapProps {
   earthquakes: EarthquakeFeature[];
@@ -10,6 +10,12 @@ interface MapProps {
   onSelect: (id: string, feature: EarthquakeFeature) => void;
   onAnalyze: (feature: EarthquakeFeature) => void;
 }
+
+// Fix for React Leaflet type issues where TypeScript definitions may be missing standard props
+const MapContainerFixed = MapContainer as any;
+const TileLayerFixed = TileLayer as any;
+const GeoJSONFixed = GeoJSON as any;
+const PopupFixed = Popup as any;
 
 // Component to handle flying to location when selectedId changes
 const MapController: React.FC<{ selectedId: string | null; earthquakes: EarthquakeFeature[] }> = ({ selectedId, earthquakes }) => {
@@ -61,7 +67,7 @@ const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, 
 
   return (
     <div className="w-full h-full relative isolate">
-        <MapContainer
+        <MapContainerFixed
         center={[20, 0]}
         zoom={2.5}
         minZoom={2}
@@ -71,14 +77,14 @@ const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, 
         worldCopyJump={true}
         >
         <AttributionControl position="bottomright" prefix={false} />
-        <TileLayer
+        <TileLayerFixed
             attribution='&copy; <a href="https://carto.com/">CARTO</a>'
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
         {/* Tectonic Plates Layer - Rendered before quakes to stay in background */}
         {tectonicPlates && (
-            <GeoJSON 
+            <GeoJSONFixed 
                 data={tectonicPlates}
                 style={{
                     color: '#22d3ee', // Cyan-400
@@ -140,11 +146,11 @@ const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, 
                         }
                     }}
                 >
-                    <Popup className="custom-popup" closeButton={false}>
-                    <div className="min-w-[240px] font-mono">
+                    <PopupFixed className="custom-popup" closeButton={false} maxWidth={300}>
+                    <div className="font-mono text-slate-200">
                         {/* Header */}
                         <div className="flex items-center justify-between gap-3 mb-3 pb-2 border-b border-cyan-900/50">
-                            <h3 className="font-bold text-cyan-50 text-xs uppercase leading-snug">{quake.properties.place}</h3>
+                            <h3 className="font-bold text-cyan-50 text-xs uppercase leading-snug tracking-wider">{quake.properties.place}</h3>
                         </div>
                         
                         {/* Tsunami Warning in Popup */}
@@ -173,24 +179,24 @@ const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, 
                             </div>
                         </div>
 
-                        {/* Action */}
+                        {/* Action - Analysis Button */}
                         <button 
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onAnalyze(quake);
                             }}
-                            className="w-full group flex items-center justify-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 hover:border-cyan-400 text-cyan-400 text-xs font-bold py-2 px-3 transition-all tracking-wider uppercase"
+                            className="w-full group flex items-center justify-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 hover:border-cyan-400 text-cyan-400 hover:text-cyan-300 text-xs font-bold py-2.5 px-3 transition-all tracking-widest uppercase shadow-[0_0_10px_rgba(6,182,212,0.1)] hover:shadow-[0_0_15px_rgba(6,182,212,0.3)]"
                         >
-                            <Cpu className="w-3 h-3 group-hover:animate-spin" />
-                            <span>Initiate Analysis</span>
+                            <ScanLine className="w-3 h-3 group-hover:animate-pulse" />
+                            <span>Initiate AI Analysis</span>
                         </button>
                     </div>
-                    </Popup>
+                    </PopupFixed>
                 </CircleMarker>
               </React.Fragment>
             );
         })}
-        </MapContainer>
+        </MapContainerFixed>
     </div>
   );
 };
