@@ -56,33 +56,31 @@
         outline: none;
       }
       
-      /* Neon Glows via CSS Filters */
-      path.quake-low {
-        filter: drop-shadow(0 0 2px #10b981);
-        stroke: #10b981;
-        stroke-width: 1;
-        fill-opacity: 0.6;
-      }
-      path.quake-med {
-        filter: drop-shadow(0 0 4px #eab308);
-        stroke: #eab308;
-        stroke-width: 1;
-      }
-      path.quake-high {
-        filter: drop-shadow(0 0 6px #f97316);
-        stroke: #f97316;
-        stroke-width: 2;
-      }
-      path.quake-extreme {
-        filter: drop-shadow(0 0 10px #ef4444);
-        stroke: #ef4444;
-        stroke-width: 2;
-        animation: pulse-stroke 2s infinite alternate;
+      /* Tectonic Plates Glow */
+      path.tectonic-line {
+        filter: drop-shadow(0 0 3px #06b6d4);
+        stroke-dasharray: 6 3; /* Dashed tech look */
       }
 
-      @keyframes pulse-stroke {
-        from { stroke-width: 2; opacity: 0.8; }
-        to { stroke-width: 4; opacity: 1; }
+      /* --- TSUNAMI ANIMATION --- */
+      @keyframes ripple-flash {
+        0% { stroke-width: 2; stroke-opacity: 1; opacity: 1; }
+        100% { stroke-width: 25; stroke-opacity: 0; opacity: 0; }
+      }
+
+      path.tsunami-ring {
+        animation: ripple-flash 2s infinite ease-out;
+        transform-origin: center;
+        fill: none;
+      }
+
+      /* Standard Markers with Depth Colors (Applied via inline styles mostly, but glow helper classes here) */
+      path.quake-marker {
+        transition: all 0.3s ease;
+      }
+      path.quake-marker:hover {
+        filter: brightness(1.5) drop-shadow(0 0 5px white);
+        stroke-width: 3;
       }
 
       /* --- CYBER UI ELEMENTS --- */

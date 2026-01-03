@@ -1,6 +1,6 @@
 import React from 'react';
 import { EarthquakeFeature } from '../types';
-import { Activity, Radio, Clock, MapPin, Search, Database, BarChart3, Wifi } from 'lucide-react';
+import { Activity, Radio, Clock, MapPin, Search, Database, BarChart3, Wifi, Waves } from 'lucide-react';
 
 interface SidebarProps {
   earthquakes: EarthquakeFeature[];
@@ -142,6 +142,14 @@ const Sidebar: React.FC<SidebarProps> = ({ earthquakes, onSelect, selectedId, la
                         </h4>
                     </div>
                     
+                    {/* Tsunami Badge (New Feature) */}
+                    {quake.properties.tsunami === 1 && (
+                        <div className="flex items-center gap-1.5 ml-5 mb-1 text-cyan-400 animate-pulse">
+                            <Waves className="w-3 h-3" />
+                            <span className="text-[10px] font-bold tracking-wider uppercase">TSUNAMI WARNING</span>
+                        </div>
+                    )}
+
                     {/* Secondary: Metadata */}
                     <div className="flex items-center gap-4 pl-5">
                         <span className="text-[10px] text-slate-600 flex items-center gap-1.5 font-mono">

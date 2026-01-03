@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap, AttributionControl } from 'react-leaflet';
+import React, { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap, AttributionControl, GeoJSON } from 'react-leaflet';
 import { EarthquakeFeature } from '../types';
-import { Activity, Radio, Cpu, Clock } from 'lucide-react';
+import { fetchTectonicPlates } from '../services/usgs';
+import { Activity, Radio, Cpu, Waves } from 'lucide-react';
 
 interface MapProps {
   earthquakes: EarthquakeFeature[];
@@ -36,20 +37,22 @@ const MapController: React.FC<{ selectedId: string | null; earthquakes: Earthqua
 };
 
 const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, onAnalyze }) => {
-  
-  // Helper to determine the CSS class for the SVG path
-  const getGlowClass = (mag: number) => {
-    if (mag < 2.0) return 'quake-low';
-    if (mag < 4.5) return 'quake-med';
-    if (mag < 6.0) return 'quake-high';
-    return 'quake-extreme';
-  };
+  const [tectonicPlates, setTectonicPlates] = useState<any>(null);
 
-  const getColor = (mag: number) => {
-    if (mag < 2.0) return '#10b981'; // emerald
-    if (mag < 4.5) return '#eab308'; // yellow
-    if (mag < 6.0) return '#f97316'; // orange
-    return '#ef4444'; // red
+  useEffect(() => {
+      fetchTectonicPlates().then(data => {
+          if (data) setTectonicPlates(data);
+      });
+  }, []);
+  
+  // Logic: Color now based on DEPTH
+  // Shallow (<10km) = Red
+  // Intermediate (10-70km) = Yellow
+  // Deep (>70km) = Blue
+  const getDepthColor = (depth: number) => {
+    if (depth < 10) return '#ef4444'; // Red (Shallow/Dangerous)
+    if (depth <= 70) return '#eab308'; // Yellow (Intermediate)
+    return '#3b82f6'; // Blue (Deep)
   };
 
   const getRadius = (mag: number) => {
@@ -72,6 +75,19 @@ const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, 
             attribution='&copy; <a href="https://carto.com/">CARTO</a>'
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
+
+        {/* Tectonic Plates Layer - Rendered before quakes to stay in background */}
+        {tectonicPlates && (
+            <GeoJSON 
+                data={tectonicPlates}
+                style={{
+                    color: '#22d3ee', // Cyan-400
+                    weight: 1.5,
+                    opacity: 0.3,
+                    className: 'tectonic-line' // See index.html for glow filter
+                }}
+            />
+        )}
         
         <MapController selectedId={selectedId} earthquakes={earthquakes} />
 
@@ -79,77 +95,99 @@ const EarthquakeMap: React.FC<MapProps> = ({ earthquakes, selectedId, onSelect, 
             const [lng, lat, depth] = quake.geometry.coordinates;
             const mag = quake.properties.mag;
             const isSelected = selectedId === quake.id;
+            const isTsunami = quake.properties.tsunami === 1;
+            
+            const depthColor = getDepthColor(depth);
+            const radius = getRadius(mag);
 
             return (
-            <CircleMarker
-                key={quake.id}
-                center={[lat, lng]}
-                radius={getRadius(mag)}
-                // IMPORTANT: passing css class to the SVG path
-                className={getGlowClass(mag)}
-                pathOptions={{
-                color: getColor(mag), // Stroke color
-                fillColor: getColor(mag), // Fill color
-                fillOpacity: isSelected ? 0.9 : 0.4, // Lower opacity to let glow shine
-                weight: isSelected ? 2 : 1,
-                }}
-                eventHandlers={{
-                click: () => onSelect(quake.id, quake),
-                mouseover: (e) => {
-                    const layer = e.target;
-                    layer.setStyle({
-                    fillOpacity: 1,
-                    weight: 3,
-                    });
-                },
-                mouseout: (e) => {
-                    const layer = e.target;
-                    layer.setStyle({
-                    fillOpacity: isSelected ? 0.9 : 0.4,
-                    weight: isSelected ? 2 : 1,
-                    });
-                }
-                }}
-            >
-                <Popup className="custom-popup" closeButton={false}>
-                <div className="min-w-[240px] font-mono">
-                    {/* Header */}
-                    <div className="flex items-center justify-between gap-3 mb-3 pb-2 border-b border-cyan-900/50">
-                        <h3 className="font-bold text-cyan-50 text-xs uppercase leading-snug">{quake.properties.place}</h3>
-                    </div>
-                    
-                    {/* Stats */}
-                    <div className="grid grid-cols-2 gap-4 text-xs text-slate-400 mb-4">
-                        <div className="flex flex-col gap-1">
-                            <span className="uppercase text-[9px] tracking-wider text-slate-500">Depth</span>
-                            <div className="flex items-center gap-1.5 text-cyan-300">
-                                <Activity className="w-3 h-3" />
-                                <span>{depth} KM</span>
-                            </div>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <span className="uppercase text-[9px] tracking-wider text-slate-500">Mag</span>
-                            <div className="flex items-center gap-1.5 font-bold" style={{ color: getColor(mag) }}>
-                                <Radio className="w-3 h-3" />
-                                <span>{mag.toFixed(1)}</span>
-                            </div>
-                        </div>
-                    </div>
+              <React.Fragment key={quake.id}>
+                {/* Tsunami Pulse Effect Layer (Renders under the main marker) */}
+                {isTsunami && (
+                   <CircleMarker
+                      center={[lat, lng]}
+                      radius={radius}
+                      className="tsunami-ring" // CSS animation defined in index.html
+                      pathOptions={{
+                        color: '#06b6d4', // Cyan pulse
+                        fill: false,
+                        weight: 2
+                      }}
+                      interactive={false} 
+                   />
+                )}
 
-                    {/* Action */}
-                    <button 
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onAnalyze(quake);
-                        }}
-                        className="w-full group flex items-center justify-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 hover:border-cyan-400 text-cyan-400 text-xs font-bold py-2 px-3 transition-all tracking-wider uppercase"
-                    >
-                        <Cpu className="w-3 h-3 group-hover:animate-spin" />
-                        <span>Initiate Analysis</span>
-                    </button>
-                </div>
-                </Popup>
-            </CircleMarker>
+                {/* Main Data Marker */}
+                <CircleMarker
+                    center={[lat, lng]}
+                    radius={radius}
+                    className="quake-marker"
+                    pathOptions={{
+                        color: depthColor, // Stroke color (Depth)
+                        fillColor: depthColor, // Fill color (Depth)
+                        fillOpacity: isSelected ? 0.9 : 0.5,
+                        weight: isSelected ? 2 : 1,
+                    }}
+                    eventHandlers={{
+                        click: () => onSelect(quake.id, quake),
+                        mouseover: (e) => {
+                            const layer = e.target;
+                            layer.setStyle({ fillOpacity: 1, weight: 3 });
+                        },
+                        mouseout: (e) => {
+                            const layer = e.target;
+                            layer.setStyle({ fillOpacity: isSelected ? 0.9 : 0.5, weight: isSelected ? 2 : 1 });
+                        }
+                    }}
+                >
+                    <Popup className="custom-popup" closeButton={false}>
+                    <div className="min-w-[240px] font-mono">
+                        {/* Header */}
+                        <div className="flex items-center justify-between gap-3 mb-3 pb-2 border-b border-cyan-900/50">
+                            <h3 className="font-bold text-cyan-50 text-xs uppercase leading-snug">{quake.properties.place}</h3>
+                        </div>
+                        
+                        {/* Tsunami Warning in Popup */}
+                        {isTsunami && (
+                            <div className="mb-3 bg-cyan-950/50 border border-cyan-500/50 p-2 flex items-center gap-2 animate-pulse">
+                                <Waves className="w-4 h-4 text-cyan-400" />
+                                <span className="text-xs font-bold text-cyan-100 uppercase tracking-widest">Tsunami Warning</span>
+                            </div>
+                        )}
+
+                        {/* Stats */}
+                        <div className="grid grid-cols-2 gap-4 text-xs text-slate-400 mb-4">
+                            <div className="flex flex-col gap-1">
+                                <span className="uppercase text-[9px] tracking-wider text-slate-500">Depth</span>
+                                <div className="flex items-center gap-1.5" style={{ color: depthColor }}>
+                                    <Activity className="w-3 h-3" />
+                                    <span className="font-bold">{depth} KM</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <span className="uppercase text-[9px] tracking-wider text-slate-500">Mag</span>
+                                <div className="flex items-center gap-1.5 font-bold text-slate-200">
+                                    <Radio className="w-3 h-3" />
+                                    <span>{mag.toFixed(1)}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Action */}
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onAnalyze(quake);
+                            }}
+                            className="w-full group flex items-center justify-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 hover:border-cyan-400 text-cyan-400 text-xs font-bold py-2 px-3 transition-all tracking-wider uppercase"
+                        >
+                            <Cpu className="w-3 h-3 group-hover:animate-spin" />
+                            <span>Initiate Analysis</span>
+                        </button>
+                    </div>
+                    </Popup>
+                </CircleMarker>
+              </React.Fragment>
             );
         })}
         </MapContainer>
