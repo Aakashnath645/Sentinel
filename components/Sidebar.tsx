@@ -843,8 +843,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                                     <BarChart3 className="w-3 h-3" /> Frequency-Magnitude Distribution
                                 </h4>
                                 <div className="h-32 flex items-end gap-2 px-2 pb-2 border-b border-l border-slate-700">
-                                    {Object.entries(analyticsData.distribution).map(([key, count]) => {
-                                        const max = Math.max(...Object.values(analyticsData.distribution));
+                                    {Object.entries(analyticsData.distribution).map(([key, rawCount]) => {
+                                        const count = rawCount as number;
+                                        const values = Object.values(analyticsData.distribution) as number[];
+                                        const max = Math.max(...values);
                                         const height = max > 0 ? (count / max) * 100 : 0;
                                         
                                         // Colors based on magnitude range logic

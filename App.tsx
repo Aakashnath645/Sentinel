@@ -94,7 +94,7 @@ const App: React.FC = () => {
   // --- SCREENSAVER / PATROL MODE STATE ---
   const [isIdle, setIsIdle] = useState(false);
   const [patrolIndex, setPatrolIndex] = useState(0);
-  const idleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const idleTimeoutRef = useRef<number | null>(null);
 
   const activeLegend = useMemo(() => LEGENDS[currentLegendIndex], [currentLegendIndex]);
 
@@ -114,7 +114,7 @@ const App: React.FC = () => {
 
       setIsIdle(false);
       if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
-      idleTimeoutRef.current = setTimeout(() => {
+      idleTimeoutRef.current = window.setTimeout(() => {
           setIsIdle(true);
           setPatrolIndex(0); // Start patrol from top
       }, IDLE_TIMEOUT);
