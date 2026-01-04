@@ -6,8 +6,9 @@ import MuseumSlider from './components/MuseumSlider';
 import SplashScreen from './components/SplashScreen';
 import { fetchEarthquakes, fetchVolcanoes } from './services/usgs';
 import { fetchSpaceWeather } from './services/noaa';
+import { fetchISSPosition } from './services/iss';
 import { LEGENDS } from './data/legends';
-import { EarthquakeFeature, USGSGeoJSON, VolcanoFeature, SpaceWeather } from './types';
+import { EarthquakeFeature, USGSGeoJSON, VolcanoFeature, SpaceWeather, ISSPosition } from './types';
 import { Loader2, AlertCircle, Scan, Map as MapIcon, Globe } from 'lucide-react';
 
 // --- Sound Utility ---
@@ -60,6 +61,9 @@ const App: React.FC = () => {
   const [earthquakes, setEarthquakes] = useState<EarthquakeFeature[]>([]);
   const [volcanoes, setVolcanoes] = useState<VolcanoFeature[]>([]);
   const [spaceWeather, setSpaceWeather] = useState<SpaceWeather | null>(null);
+  const [issPosition, setIssPosition] = useState<ISSPosition | null>(null);
+  const [issPath, setIssPath] = useState<[number, number][]>([]);
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -186,10 +190,27 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Fetch Secondary Data
+  // Fetch Secondary Data & ISS Polling
   useEffect(() => {
       fetchVolcanoes().then(setVolcanoes);
       fetchSpaceWeather().then(setSpaceWeather);
+
+      // Initial ISS fetch
+      const pollISS = async () => {
+          const pos = await fetchISSPosition();
+          if (pos) {
+              setIssPosition(pos);
+              setIssPath(prev => {
+                  const newPath = [...prev, [pos.latitude, pos.longitude] as [number, number]];
+                  // Keep roughly last 30 points (approx 1 min at 2s poll)
+                  return newPath.slice(-30);
+              });
+          }
+      };
+      pollISS();
+
+      const issInterval = setInterval(pollISS, 2000);
+      return () => clearInterval(issInterval);
   }, []);
 
   // Initial fetch, Poll, and Geolocation
@@ -316,9 +337,14 @@ const App: React.FC = () => {
       }
   };
 
+  // Stable callback for splash screen to prevent infinite re-render/reset of timer
+  const handleSplashComplete = useCallback(() => {
+      setShowSplash(false);
+  }, []);
+
   return (
     <>
-      {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
+      {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
       
       <div className={`flex h-[100dvh] w-screen bg-[conic-gradient(at_bottom_left,_var(--tw-gradient-stops))] from-slate-950 via-slate-900 to-zinc-950 overflow-hidden relative transition-opacity duration-1000 ${showSplash ? 'opacity-0' : 'opacity-100'}`}>
         
@@ -397,6 +423,8 @@ const App: React.FC = () => {
                   onMapClick={handleMapClick}
                   isIdle={isIdle}
                   patrolTarget={currentPatrolTarget}
+                  issPosition={issPosition}
+                  issPath={issPath}
               />
 
               {/* Museum Controls - Fades when idle */}

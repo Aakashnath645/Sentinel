@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { EarthquakeFeature, LegendEvent, VolcanoFeature, SpaceWeather } from '../types';
-import { Activity, Radio, Clock, MapPin, Search, Database, BarChart3, Wifi, Waves, Navigation, AlertTriangle, PanelLeftClose, PanelLeftOpen, Landmark, Skull, Beaker, Zap, Layers, Play, RotateCcw, Target, MousePointer2, ClipboardCheck, ShieldAlert, CheckSquare, Siren, Hammer, ChevronRight, LineChart, AlertOctagon, Flame, Mountain, Sun } from 'lucide-react';
+import { Activity, Radio, Clock, MapPin, Search, Database, BarChart3, Wifi, Waves, Navigation, AlertTriangle, PanelLeftClose, PanelLeftOpen, Landmark, Skull, Beaker, Zap, Layers, Play, RotateCcw, Target, MousePointer2, ClipboardCheck, ShieldAlert, CheckSquare, Siren, Hammer, ChevronRight, LineChart, AlertOctagon, Flame, Mountain, Sun, BookOpen, FileText, Info } from 'lucide-react';
 
 interface SidebarProps {
   viewMode: 'live' | 'museum' | 'lab' | 'protocols' | 'magma' | 'cosmic';
@@ -28,21 +28,6 @@ interface SidebarProps {
   onWaveReset: () => void;
   onWaveStart: () => void;
 }
-
-const GO_BAG_ITEMS = [
-    { id: 'water', label: 'Water (1 gal/person/day)' },
-    { id: 'food', label: 'Non-perishable Food (3 days)' },
-    { id: 'flashlight', label: 'Flashlight + Extra Batteries' },
-    { id: 'firstaid', label: 'First Aid Kit' },
-    { id: 'whistle', label: 'Whistle (Signal for help)' },
-    { id: 'mask', label: 'Dust Mask (N95)' },
-    { id: 'wipes', label: 'Moist Towelettes / Garbage Bags' },
-    { id: 'wrench', label: 'Wrench/Pliers (Utilities)' },
-    { id: 'canopener', label: 'Manual Can Opener' },
-    { id: 'maps', label: 'Local Maps (Paper)' },
-    { id: 'powerbank', label: 'Portable Power Bank' },
-    { id: 'radio', label: 'Hand-crank / Battery Radio' }
-];
 
 // Helper to calculate energy in Joules
 const calculateEnergy = (mag: number) => {
@@ -84,33 +69,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isCollapsed, setIsCollapsed] = useState(false);
   
   // Protocols State
-  const [protocolTab, setProtocolTab] = useState<'during' | 'after' | 'tsunami'>('during');
-  const [checklist, setChecklist] = useState<Record<string, boolean>>({});
-
-  // Load Checklist from LocalStorage
-  useEffect(() => {
-      const saved = localStorage.getItem('sentinel_gobag');
-      if (saved) {
-          try {
-              setChecklist(JSON.parse(saved));
-          } catch (e) {
-              console.error("Failed to parse checklist", e);
-          }
-      }
-  }, []);
-
-  // Save Checklist
-  const toggleCheckItem = (id: string) => {
-      const updated = { ...checklist, [id]: !checklist[id] };
-      setChecklist(updated);
-      localStorage.setItem('sentinel_gobag', JSON.stringify(updated));
-  };
-
-  const checklistProgress = useMemo(() => {
-      const total = GO_BAG_ITEMS.length;
-      const checked = GO_BAG_ITEMS.filter(i => checklist[i.id]).length;
-      return Math.round((checked / total) * 100);
-  }, [checklist]);
+  const [protocolTab, setProtocolTab] = useState<'preparedness' | 'response' | 'recovery'>('preparedness');
 
   // Stats Calculation
   const totalEvents = earthquakes.length;
@@ -418,13 +377,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold tracking-[0.2em] text-cyan-50 font-mono leading-none">SENTINEL</h1>
-                            <p className="text-[10px] text-cyan-500 uppercase tracking-widest mt-1 font-semibold">Seismic Array v2.0</p>
+                            <p className="text-[10px] text-cyan-500 uppercase tracking-widest mt-1 font-semibold">Planetary Surveillance</p>
                         </div>
                     </div>
                     <div className="text-right pr-6">
                         <div className="flex items-center justify-end gap-2 mb-1">
                             <Wifi className="w-3 h-3 text-emerald-500" />
-                            <span className="text-[10px] text-emerald-500 font-mono tracking-widest">LIVE FEED</span>
+                            <span className="text-[10px] text-emerald-500 font-mono tracking-widest">LIVE SENSORS</span>
                         </div>
                         <div className="text-[10px] font-mono text-slate-500">
                             {lastUpdated.toISOString().split('T')[1].split('.')[0]} UTC
@@ -1071,165 +1030,161 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
             </div>
         )}
-
+        
         {viewMode === 'protocols' && (
-            <div className="flex-1 overflow-y-auto bg-slate-950/80 p-6 flex flex-col relative animate-fadeIn">
-                 <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+             <div className="flex-1 overflow-y-auto bg-slate-950/80 p-6 flex flex-col relative animate-fadeIn">
+                <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
                      <ShieldAlert className="w-48 h-48 text-green-500" />
                 </div>
-
-                <div className="relative z-10 space-y-8">
-                     {/* Header */}
+                
+                <div className="relative z-10 space-y-6">
                      <div>
                         <div className="flex items-center gap-2 text-green-500 mb-2">
                             <ShieldAlert className="w-4 h-4" />
-                            <span className="text-[10px] font-bold tracking-[0.3em] uppercase">Emergency Protocols</span>
+                            <span className="text-[10px] font-bold tracking-[0.3em] uppercase">Emergency Directives</span>
                         </div>
-                        <h2 className="text-2xl font-bold text-white font-mono leading-tight">PREPAREDNESS KIT</h2>
-                        
-                        {/* Progress Bar */}
-                        <div className="mt-4">
-                            <div className="flex justify-between items-end mb-1">
-                                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">Readiness Level</span>
-                                <span className={`font-mono font-bold ${checklistProgress === 100 ? 'text-green-400' : 'text-slate-200'}`}>
-                                    {checklistProgress}%
-                                </span>
-                            </div>
-                            <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                <div 
-                                    className={`h-full transition-all duration-500 ${checklistProgress === 100 ? 'bg-green-500' : 'bg-green-600/50'}`}
-                                    style={{ width: `${checklistProgress}%` }}
-                                ></div>
-                            </div>
+                        <h2 className="text-2xl font-bold text-white font-mono leading-tight">OFFICIAL SAFETY PROTOCOLS</h2>
+                        <div className="text-xs text-green-400/80 font-mono mt-2 flex items-center gap-2">
+                             <span>SOURCE: UNDRR / UNITED NATIONS</span>
+                             <span className="w-1 h-1 bg-green-500 rounded-full"></span>
+                             <span>REF: ISO 22320</span>
                         </div>
                     </div>
 
-                    {/* Go-Bag Checklist */}
-                    <div className="bg-slate-900/50 border border-slate-700 p-4">
-                        <div className="flex items-center gap-2 mb-4 text-slate-400">
-                             <CheckSquare className="w-4 h-4" />
-                             <h3 className="text-xs font-bold uppercase tracking-widest">Go-Bag Diagnostic</h3>
-                        </div>
-                        <div className="space-y-1">
-                            {GO_BAG_ITEMS.map((item) => {
-                                const isChecked = !!checklist[item.id];
-                                return (
-                                    <div 
-                                        key={item.id}
-                                        onClick={() => toggleCheckItem(item.id)}
-                                        className={`flex items-center gap-3 p-2 cursor-pointer border border-transparent hover:bg-slate-800/50 transition-colors group ${isChecked ? 'text-green-100' : 'text-slate-500'}`}
-                                    >
-                                        <div className={`font-mono text-xs font-bold ${isChecked ? 'text-green-500' : 'text-slate-700'}`}>
-                                            [{isChecked ? ' OK ' : ' -- '}]
+                    <div className="flex border border-slate-800 rounded-lg p-1 bg-slate-900/50">
+                        <button
+                            onClick={() => setProtocolTab('preparedness')}
+                            className={`flex-1 py-2 text-xs font-bold uppercase rounded-md transition-all ${
+                                protocolTab === 'preparedness' ? 'bg-green-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                        >
+                            <BookOpen className="w-3 h-3 inline mr-1" /> Mitigation
+                        </button>
+                        <button
+                            onClick={() => setProtocolTab('response')}
+                            className={`flex-1 py-2 text-xs font-bold uppercase rounded-md transition-all ${
+                                protocolTab === 'response' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                        >
+                            <Siren className="w-3 h-3 inline mr-1" /> Response
+                        </button>
+                        <button
+                            onClick={() => setProtocolTab('recovery')}
+                            className={`flex-1 py-2 text-xs font-bold uppercase rounded-md transition-all ${
+                                protocolTab === 'recovery' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                        >
+                            <Hammer className="w-3 h-3 inline mr-1" /> Recovery
+                        </button>
+                    </div>
+
+                    <div className="bg-slate-900 border border-slate-800 p-6 font-mono relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 via-transparent to-green-500 opacity-50"></div>
+                        
+                        {protocolTab === 'preparedness' && (
+                            <div className="space-y-4 animate-fadeIn">
+                                <h3 className="text-green-400 font-bold uppercase text-sm border-b border-slate-700 pb-2 mb-4">Phase 1: Risk Reduction & Preparedness</h3>
+                                
+                                <div className="space-y-4 text-xs text-slate-300 leading-relaxed">
+                                    <div className="flex gap-3">
+                                        <div className="text-green-500 font-bold">01</div>
+                                        <div>
+                                            <strong className="block text-white mb-1 uppercase">Structural Assessment</strong>
+                                            Identify potential hazards in the home. Secure heavy furniture, appliances, and water heaters to wall studs. Inspect foundation for cracks.
                                         </div>
-                                        <div className="text-xs font-medium flex-1">{item.label}</div>
-                                        {isChecked && <CheckSquare className="w-3 h-3 text-green-500 opacity-50" />}
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </div>
+                                    <div className="flex gap-3">
+                                        <div className="text-green-500 font-bold">02</div>
+                                        <div>
+                                            <strong className="block text-white mb-1 uppercase">Emergency Supply Cache</strong>
+                                            Maintain a supply kit sufficient for 72 hours minimum. Include: Potable water (4L per person/day), non-perishable rations, first aid supplies, and battery-operated communication devices.
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <div className="text-green-500 font-bold">03</div>
+                                        <div>
+                                            <strong className="block text-white mb-1 uppercase">Communication Plan</strong>
+                                            Establish an out-of-area contact. SMS is often more reliable than voice calls during network congestion. designate a meeting point.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-                    {/* Emergency Guide Tabs */}
-                    <div>
-                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                            <Siren className="w-4 h-4" /> Emergency Action Guide
-                        </h3>
-                        
-                        <div className="flex border border-slate-800 rounded-t-lg bg-slate-900/50">
-                             <button
-                                onClick={() => setProtocolTab('during')}
-                                className={`flex-1 py-2 text-[10px] font-bold uppercase transition-all ${protocolTab === 'during' ? 'bg-slate-800 text-white border-b-2 border-red-500' : 'text-slate-500 hover:text-slate-300'}`}
-                             >
-                                During
-                             </button>
-                             <button
-                                onClick={() => setProtocolTab('after')}
-                                className={`flex-1 py-2 text-[10px] font-bold uppercase transition-all ${protocolTab === 'after' ? 'bg-slate-800 text-white border-b-2 border-yellow-500' : 'text-slate-500 hover:text-slate-300'}`}
-                             >
-                                After
-                             </button>
-                             <button
-                                onClick={() => setProtocolTab('tsunami')}
-                                className={`flex-1 py-2 text-[10px] font-bold uppercase transition-all ${protocolTab === 'tsunami' ? 'bg-slate-800 text-white border-b-2 border-cyan-500' : 'text-slate-500 hover:text-slate-300'}`}
-                             >
-                                Tsunami
-                             </button>
-                        </div>
+                        {protocolTab === 'response' && (
+                            <div className="space-y-4 animate-fadeIn">
+                                <h3 className="text-red-400 font-bold uppercase text-sm border-b border-slate-700 pb-2 mb-4">Phase 2: Emergency Response</h3>
+                                
+                                <div className="p-4 bg-red-950/30 border border-red-500/30 mb-4 text-center">
+                                     <strong className="text-red-500 text-lg block mb-1">DROP, COVER, HOLD ON</strong>
+                                     <span className="text-red-200/80 text-xs">Standard International Protocol</span>
+                                </div>
 
-                        <div className="bg-slate-900 border border-t-0 border-slate-800 p-4 rounded-b-lg">
-                             {protocolTab === 'during' && (
-                                 <div className="space-y-4 animate-fadeIn">
-                                     <div className="flex gap-4 items-start">
-                                         <div className="w-10 h-10 bg-red-900/30 border border-red-500/50 flex items-center justify-center text-red-500 font-bold text-lg rounded">1</div>
-                                         <div>
-                                             <h4 className="text-red-400 font-bold uppercase text-sm mb-1">DROP, COVER, HOLD ON</h4>
-                                             <p className="text-xs text-slate-400 leading-relaxed">
-                                                 Drop to your hands and knees. Cover your head and neck with your arms. Hold on to any sturdy furniture until the shaking stops.
-                                             </p>
-                                         </div>
-                                     </div>
-                                     <div className="flex gap-4 items-start">
-                                         <div className="w-10 h-10 bg-slate-800 border border-slate-600 flex items-center justify-center text-slate-400 font-bold text-lg rounded">2</div>
-                                         <div>
-                                             <h4 className="text-slate-200 font-bold uppercase text-sm mb-1">STAY INDOORS</h4>
-                                             <p className="text-xs text-slate-400 leading-relaxed">
-                                                 Do not run outside. Falling debris, glass, and building facades are the greatest hazards.
-                                             </p>
-                                         </div>
-                                     </div>
-                                 </div>
-                             )}
+                                <div className="space-y-4 text-xs text-slate-300 leading-relaxed">
+                                    <div className="flex gap-3">
+                                        <div className="text-red-500 font-bold">01</div>
+                                        <div>
+                                            <strong className="block text-white mb-1 uppercase">Indoors</strong>
+                                            Do not run outside. Move away from windows, fireplaces, and heavy furniture. Take cover under a sturdy table.
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <div className="text-red-500 font-bold">02</div>
+                                        <div>
+                                            <strong className="block text-white mb-1 uppercase">Outdoors</strong>
+                                            Move to a clear area away from buildings, trees, streetlights, and utility wires. Once in the open, stay there until shaking stops.
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <div className="text-red-500 font-bold">03</div>
+                                        <div>
+                                            <strong className="block text-white mb-1 uppercase">Driving</strong>
+                                            Pull over to a clear location. Stop and stay inside with seatbelt fastened. Avoid bridges, overpasses, and power lines.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-                             {protocolTab === 'after' && (
-                                 <div className="space-y-4 animate-fadeIn">
-                                     <div className="flex gap-4 items-start">
-                                         <div className="w-10 h-10 bg-yellow-900/30 border border-yellow-500/50 flex items-center justify-center text-yellow-500 font-bold text-lg rounded">
-                                             <Hammer className="w-5 h-5" />
-                                         </div>
-                                         <div>
-                                             <h4 className="text-yellow-400 font-bold uppercase text-sm mb-1">CHECK INFRASTRUCTURE</h4>
-                                             <p className="text-xs text-slate-400 leading-relaxed">
-                                                 Smell for gas. Check for electrical damage. If you suspect a leak, turn off utilities at the main valve.
-                                             </p>
-                                         </div>
-                                     </div>
-                                     <div className="flex gap-4 items-start">
-                                         <div className="w-10 h-10 bg-slate-800 border border-slate-600 flex items-center justify-center text-slate-400 font-bold text-lg rounded">!</div>
-                                         <div>
-                                             <h4 className="text-slate-200 font-bold uppercase text-sm mb-1">EXPECT AFTERSHOCKS</h4>
-                                             <p className="text-xs text-slate-400 leading-relaxed">
-                                                 Secondary shockwaves can collapse damaged structures. Stay alert and avoid elevators.
-                                             </p>
-                                         </div>
-                                     </div>
-                                 </div>
-                             )}
+                        {protocolTab === 'recovery' && (
+                            <div className="space-y-4 animate-fadeIn">
+                                <h3 className="text-blue-400 font-bold uppercase text-sm border-b border-slate-700 pb-2 mb-4">Phase 3: Post-Event Assessment</h3>
+                                
+                                <div className="space-y-4 text-xs text-slate-300 leading-relaxed">
+                                    <div className="flex gap-3">
+                                        <div className="text-blue-500 font-bold">01</div>
+                                        <div>
+                                            <strong className="block text-white mb-1 uppercase">Expect Aftershocks</strong>
+                                            Secondary shockwaves may follow the main event. These can cause further damage to weakened structures.
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <div className="text-blue-500 font-bold">02</div>
+                                        <div>
+                                            <strong className="block text-white mb-1 uppercase">Utility Inspection</strong>
+                                            Check for gas leaks. If you smell gas or hear a blowing or hissing noise, open a window and quickly leave the building. Turn off the gas at the outside main valve if possible.
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <div className="text-blue-500 font-bold">03</div>
+                                        <div>
+                                            <strong className="block text-white mb-1 uppercase">Tsunami Awareness</strong>
+                                            If in a coastal zone, move to higher ground immediately if the shaking was strong enough to make standing difficult.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-                             {protocolTab === 'tsunami' && (
-                                 <div className="space-y-4 animate-fadeIn">
-                                     <div className="flex gap-4 items-start">
-                                         <div className="w-10 h-10 bg-cyan-900/30 border border-cyan-500/50 flex items-center justify-center text-cyan-500 font-bold text-lg rounded">
-                                             <Waves className="w-5 h-5" />
-                                         </div>
-                                         <div>
-                                             <h4 className="text-cyan-400 font-bold uppercase text-sm mb-1">GET TO HIGH GROUND</h4>
-                                             <p className="text-xs text-slate-400 leading-relaxed">
-                                                 If you are near the coast and feel strong shaking, move inland or to high ground immediately. Do not wait for an official warning.
-                                             </p>
-                                         </div>
-                                     </div>
-                                     <div className="p-3 bg-red-950/20 border border-red-500/20 text-red-300 text-[10px] font-mono">
-                                         WARNING: Tsunami waves can arrive for hours. Do not return to the coast until officials declare it safe.
-                                     </div>
-                                 </div>
-                             )}
+                        <div className="mt-8 pt-4 border-t border-slate-800 flex justify-between items-center text-[10px] text-slate-500 uppercase">
+                            <span>UN Document ID: 88-2911-B</span>
+                            <span className="flex items-center gap-1"><Info className="w-3 h-3" /> Official Guidance</span>
                         </div>
                     </div>
                 </div>
-            </div>
+             </div>
         )}
-        
+
         {/* Footer / Credits */}
         <div className="flex-none p-3 border-t border-slate-800 bg-slate-950 text-center">
             <p className="text-[9px] text-slate-700 font-mono tracking-widest uppercase">

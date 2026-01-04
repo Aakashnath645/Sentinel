@@ -71,6 +71,15 @@ export interface SpaceWeather {
     status: 'Quiet' | 'Unsettled' | 'Storm';
 }
 
+export interface ISSPosition {
+    latitude: number;
+    longitude: number;
+    altitude: number; // km
+    velocity: number; // km/h
+    visibility: string;
+    timestamp: number;
+}
+
 export interface GroundingChunk {
     web?: {
         uri: string;

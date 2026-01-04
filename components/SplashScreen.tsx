@@ -81,9 +81,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
 
         {/* Subtitle / Version */}
         <div className="flex items-center gap-4 text-cyan-500/70 font-mono tracking-[0.4em] text-xs md:text-sm uppercase mb-12">
-           <span className="flex items-center gap-2"><Globe className="w-3 h-3" /> Global Seismic Monitor</span>
+           <span className="flex items-center gap-2"><Globe className="w-3 h-3" /> Planetary Surveillance Network</span>
            <span className="w-1 h-1 bg-cyan-500 rounded-full"></span>
-           <span>v2.0.4</span>
+           <span>v2.1.0</span>
         </div>
 
         {/* Loading Bar */}
