@@ -1,4 +1,5 @@
 
+
 export interface EarthquakeProperties {
   mag: number;
   place: string;
@@ -62,6 +63,12 @@ export interface VolcanoFeature {
     lastEruption: string;
     elevation: number;
     type: string;
+}
+
+export interface SpaceWeather {
+    kp: number; // 0-9 scale
+    time: string;
+    status: 'Quiet' | 'Unsettled' | 'Storm';
 }
 
 export interface GroundingChunk {

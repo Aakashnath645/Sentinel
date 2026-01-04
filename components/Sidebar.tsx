@@ -1,12 +1,13 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { EarthquakeFeature, LegendEvent, VolcanoFeature } from '../types';
-import { Activity, Radio, Clock, MapPin, Search, Database, BarChart3, Wifi, Waves, Navigation, AlertTriangle, PanelLeftClose, PanelLeftOpen, Landmark, Skull, Beaker, Zap, Layers, Play, RotateCcw, Target, MousePointer2, ClipboardCheck, ShieldAlert, CheckSquare, Siren, Hammer, ChevronRight, LineChart, AlertOctagon, Flame, Mountain } from 'lucide-react';
+import { EarthquakeFeature, LegendEvent, VolcanoFeature, SpaceWeather } from '../types';
+import { Activity, Radio, Clock, MapPin, Search, Database, BarChart3, Wifi, Waves, Navigation, AlertTriangle, PanelLeftClose, PanelLeftOpen, Landmark, Skull, Beaker, Zap, Layers, Play, RotateCcw, Target, MousePointer2, ClipboardCheck, ShieldAlert, CheckSquare, Siren, Hammer, ChevronRight, LineChart, AlertOctagon, Flame, Mountain, Sun } from 'lucide-react';
 
 interface SidebarProps {
-  viewMode: 'live' | 'museum' | 'lab' | 'protocols' | 'magma';
-  onViewModeChange: (mode: 'live' | 'museum' | 'lab' | 'protocols' | 'magma') => void;
+  viewMode: 'live' | 'museum' | 'lab' | 'protocols' | 'magma' | 'cosmic';
+  onViewModeChange: (mode: 'live' | 'museum' | 'lab' | 'protocols' | 'magma' | 'cosmic') => void;
   earthquakes: EarthquakeFeature[];
   volcanoes: VolcanoFeature[];
+  spaceWeather: SpaceWeather | null;
   onSelect: (id: string, feature: EarthquakeFeature) => void;
   selectedId: string | null;
   lastUpdated: Date;
@@ -63,6 +64,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     onViewModeChange,
     earthquakes,
     volcanoes, 
+    spaceWeather,
     onSelect, 
     selectedId, 
     lastUpdated, 
@@ -279,6 +281,9 @@ const Sidebar: React.FC<SidebarProps> = ({
       } else if (color === "orange") {
           activeClasses = "bg-orange-900/30 text-orange-400 border-orange-500/50 shadow-[0_0_10px_rgba(249,115,22,0.3)]";
           indicatorColor = "bg-orange-500";
+      } else if (color === "blue") {
+          activeClasses = "bg-blue-900/30 text-blue-400 border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.3)]";
+          indicatorColor = "bg-blue-500";
       }
 
       return (
@@ -325,6 +330,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <NavButton id="live" icon={Wifi} color="cyan" label="Live Feed" />
               <NavButton id="museum" icon={Landmark} color="red" label="Archive" />
               <NavButton id="magma" icon={Flame} color="orange" label="Magma Monitor" />
+              <NavButton id="cosmic" icon={Sun} color="blue" label="Cosmic" />
               <NavButton id="lab" icon={Beaker} color="purple" label="Sim Lab" />
               <NavButton id="protocols" icon={ShieldAlert} color="green" label="Protocols" />
           </div>
@@ -357,6 +363,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                 }`}
              >
                  <Flame className="w-3 h-3" /> Magma
+             </button>
+             <button 
+                onClick={() => onViewModeChange('cosmic')}
+                className={`flex-1 min-w-[60px] py-3 text-[10px] font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
+                    viewMode === 'cosmic' ? 'bg-slate-900 text-blue-400 border-b-2 border-blue-500' : 'bg-slate-950 text-slate-500'
+                }`}
+             >
+                 <Sun className="w-3 h-3" /> Cosmic
              </button>
              <button 
                 onClick={() => onViewModeChange('museum')}
@@ -605,6 +619,97 @@ const Sidebar: React.FC<SidebarProps> = ({
                             </div>
                         )}
                     </div>
+                </div>
+            </div>
+        )}
+
+        {viewMode === 'cosmic' && (
+            <div className="flex-1 overflow-y-auto bg-slate-950/80 p-6 flex flex-col relative animate-fadeIn">
+                 <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                     <Sun className="w-48 h-48 text-blue-500" />
+                </div>
+
+                <div className="relative z-10 space-y-8">
+                     {/* Header */}
+                     <div>
+                        <div className="flex items-center gap-2 text-blue-400 mb-2">
+                            <Sun className="w-4 h-4" />
+                            <span className="text-[10px] font-bold tracking-[0.3em] uppercase">Cosmic Weather Station</span>
+                        </div>
+                        <h2 className="text-2xl font-bold text-white font-mono leading-tight">SOLAR & MAGNETIC</h2>
+                    </div>
+
+                    {!spaceWeather ? (
+                         <div className="flex items-center justify-center py-12">
+                             <span className="text-blue-400 font-mono animate-pulse text-sm">ACQUIRING TELEMETRY...</span>
+                         </div>
+                    ) : (
+                        <>
+                            {/* Main Kp Display */}
+                            <div className="bg-slate-900/80 border border-blue-900/50 p-6 flex flex-col items-center justify-center relative shadow-[0_0_30px_rgba(59,130,246,0.1)]">
+                                <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                                    <span className="text-[9px] text-blue-400 font-mono">LIVE FEED</span>
+                                </div>
+                                
+                                <span className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Planetary K-index</span>
+                                <div className="text-7xl font-bold font-mono text-white mb-2 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
+                                    {spaceWeather.kp.toFixed(1)}
+                                </div>
+                                
+                                <div className={`px-3 py-1 rounded border text-xs font-bold uppercase tracking-[0.2em] mb-4 ${
+                                    spaceWeather.status === 'Quiet' ? 'bg-emerald-950/50 border-emerald-500/50 text-emerald-400' :
+                                    spaceWeather.status === 'Unsettled' ? 'bg-yellow-950/50 border-yellow-500/50 text-yellow-400' :
+                                    'bg-red-950/50 border-red-500/50 text-red-500 animate-pulse'
+                                }`}>
+                                    STATUS: {spaceWeather.status}
+                                </div>
+                            </div>
+
+                            {/* Digital Gauge */}
+                            <div className="bg-slate-900/50 border border-slate-800 p-4">
+                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                    <Activity className="w-3 h-3" /> Geomagnetic Activity Monitor
+                                </h4>
+                                
+                                <div className="flex justify-between items-end gap-1 h-32 px-2 pb-2 border-b border-slate-700">
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((level) => {
+                                        const isActive = spaceWeather.kp >= level;
+                                        // Colors: 1-3 Green, 4 Yellow, 5+ Red
+                                        let barColor = 'bg-slate-800';
+                                        let glow = '';
+                                        
+                                        if (isActive) {
+                                            if (level < 4) { barColor = 'bg-emerald-500'; glow = 'shadow-[0_0_10px_rgba(16,185,129,0.5)]'; }
+                                            else if (level < 5) { barColor = 'bg-yellow-500'; glow = 'shadow-[0_0_10px_rgba(234,179,8,0.5)]'; }
+                                            else { barColor = 'bg-red-500'; glow = 'shadow-[0_0_15px_rgba(239,68,68,0.8)] animate-pulse'; }
+                                        }
+
+                                        return (
+                                            <div key={level} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                                                <div 
+                                                    className={`w-full rounded-sm transition-all duration-500 ${barColor} ${glow}`} 
+                                                    style={{ height: `${level * 10}%` }}
+                                                ></div>
+                                                <span className="text-[9px] text-slate-600 font-mono">{level}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <div className="flex justify-between text-[9px] text-slate-600 font-mono mt-2 uppercase">
+                                    <span>Quiet</span>
+                                    <span>Unsettled</span>
+                                    <span>Storm</span>
+                                </div>
+                            </div>
+
+                            {/* Info / Tooltip */}
+                            <div className="bg-blue-950/20 border-l-2 border-blue-500/50 p-4 text-xs font-mono text-slate-400 leading-relaxed">
+                                <strong className="text-blue-400 block mb-1">SYSTEM NOTE:</strong>
+                                Monitoring solar wind interactions with Earth's magnetosphere. High Kp values (&gt;5) indicate geomagnetic storms capable of disrupting GPS, radio communications, and power grids.
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
         )}
@@ -1128,7 +1233,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         {/* Footer / Credits */}
         <div className="flex-none p-3 border-t border-slate-800 bg-slate-950 text-center">
             <p className="text-[9px] text-slate-700 font-mono tracking-widest uppercase">
-                {viewMode === 'live' ? 'USGS SEISMIC FEED // SECURE LINK' : viewMode === 'museum' ? 'HISTORICAL ARCHIVE // READ ONLY' : viewMode === 'magma' ? 'MAGMA MONITOR // ACTIVE' : viewMode === 'lab' ? 'SIMULATION ENVIRONMENT // UNCLASSIFIED' : 'CIVIL DEFENSE PROTOCOLS'}
+                {viewMode === 'live' ? 'USGS SEISMIC FEED // SECURE LINK' 
+                : viewMode === 'museum' ? 'HISTORICAL ARCHIVE // READ ONLY' 
+                : viewMode === 'magma' ? 'MAGMA MONITOR // ACTIVE' 
+                : viewMode === 'cosmic' ? 'COSMIC WEATHER // NOAA FEED'
+                : viewMode === 'lab' ? 'SIMULATION ENVIRONMENT // UNCLASSIFIED' 
+                : 'CIVIL DEFENSE PROTOCOLS'}
             </p>
         </div>
       </div>

@@ -11,7 +11,7 @@ interface MapProps {
   selectedId: string | null;
   onSelect: (id: string, feature: EarthquakeFeature) => void;
   onAnalyze: (feature: EarthquakeFeature) => void;
-  viewMode: 'live' | 'museum' | 'lab' | 'protocols' | 'magma';
+  viewMode: 'live' | 'museum' | 'lab' | 'protocols' | 'magma' | 'cosmic';
   activeLegend: LegendEvent | null;
   labState: { mag: number; depth: number; location: { lat: number; lng: number } | null };
   labTab: 'impact' | 'wave' | 'forecast';
@@ -118,7 +118,7 @@ const MapClickHandler: React.FC<{ onMapClick: (latlng: {lat: number, lng: number
 const MapController: React.FC<{ 
     selectedId: string | null; 
     earthquakes: EarthquakeFeature[];
-    viewMode: 'live' | 'museum' | 'lab' | 'protocols' | 'magma';
+    viewMode: 'live' | 'museum' | 'lab' | 'protocols' | 'magma' | 'cosmic';
     activeLegend: LegendEvent | null;
     isIdle: boolean;
     patrolTarget: EarthquakeFeature | null;
@@ -127,17 +127,24 @@ const MapController: React.FC<{
   const map = useMap();
 
   useEffect(() => {
+    // Helper to validate coords
+    const isValid = (lat: number, lng: number) => !isNaN(lat) && !isNaN(lng);
+
     // 1. Screensaver Patrol Mode (Highest Priority)
     if (isIdle && patrolTarget) {
-         map.flyTo(
-             [patrolTarget.geometry.coordinates[1], patrolTarget.geometry.coordinates[0]],
-             5, // Cinematic Zoom
-             {
-                 animate: true,
-                 duration: 9, // Slow cinematic pan (almost full 10s interval)
-                 easeLinearity: 0.2
-             }
-         );
+         const lat = patrolTarget.geometry.coordinates[1];
+         const lng = patrolTarget.geometry.coordinates[0];
+         if (isValid(lat, lng)) {
+            map.flyTo(
+                [lat, lng],
+                5, // Cinematic Zoom
+                {
+                    animate: true,
+                    duration: 9, // Slow cinematic pan (almost full 10s interval)
+                    easeLinearity: 0.2
+                }
+            );
+         }
          return; // Skip other logic
     }
 
@@ -145,26 +152,28 @@ const MapController: React.FC<{
     if (viewMode === 'live' && selectedId) {
       const quake = earthquakes.find(q => q.id === selectedId);
       if (quake) {
-        map.flyTo([quake.geometry.coordinates[1], quake.geometry.coordinates[0]], 8, {
-          animate: true,
-          duration: 1.5
-        });
+        const lat = quake.geometry.coordinates[1];
+        const lng = quake.geometry.coordinates[0];
+        if (isValid(lat, lng)) {
+            map.flyTo([lat, lng], 8, {
+              animate: true,
+              duration: 1.5
+            });
+        }
       }
     } 
     // 3. Museum Mode Legend
     else if (viewMode === 'museum' && activeLegend) {
-        map.flyTo(activeLegend.coords, 5, {
-            animate: true,
-            duration: 2
-        });
+        if (isValid(activeLegend.coords[0], activeLegend.coords[1])) {
+            map.flyTo(activeLegend.coords, 5, {
+                animate: true,
+                duration: 2
+            });
+        }
     } 
-    // 4. Protocols Mode (Global View)
-    else if (viewMode === 'protocols') {
+    // 4. Global Views (Protocols, Magma, Cosmic)
+    else if (viewMode === 'protocols' || viewMode === 'magma' || viewMode === 'cosmic') {
          map.flyTo([20, 0], 2.5, { animate: true, duration: 1.5 });
-    }
-    // 5. Magma Monitor (Global View initially)
-    else if (viewMode === 'magma') {
-        map.flyTo([20, 0], 2.5, { animate: true, duration: 1.5 });
     }
   }, [selectedId, earthquakes, map, viewMode, activeLegend, isIdle, patrolTarget]);
 
@@ -246,9 +255,13 @@ const EarthquakeMap: React.FC<MapProps> = ({
             volcanoes={volcanoes}
         />
 
-        {/* LIVE MODE MARKERS */}
-        {viewMode === 'live' && earthquakes.map((quake) => {
+        {/* LIVE MODE MARKERS (AND IDLE/PATROL OVERRIDE) */}
+        {(viewMode === 'live' || isIdle) && earthquakes.map((quake) => {
             const [lng, lat, depth] = quake.geometry.coordinates;
+            
+            // Safety Check for Invalid Coordinates to prevent Leaflet crash
+            if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) return null;
+
             const mag = quake.properties.mag;
             const isSelected = selectedId === quake.id;
             const isTsunami = quake.properties.tsunami === 1;
@@ -332,8 +345,12 @@ const EarthquakeMap: React.FC<MapProps> = ({
             );
         })}
 
-        {/* MAGMA MONITOR MARKERS */}
-        {viewMode === 'magma' && volcanoes.map((volcano) => (
+        {/* MAGMA MONITOR MARKERS - Hide when Idle/Patrolling Earthquakes */}
+        {viewMode === 'magma' && !isIdle && volcanoes.map((volcano) => {
+             // Safety Check for Volcano coordinates
+             if (!volcano.coordinates || volcano.coordinates.length !== 2 || isNaN(volcano.coordinates[0]) || isNaN(volcano.coordinates[1])) return null;
+
+             return (
              <Marker 
                 key={volcano.id} 
                 position={volcano.coordinates} 
@@ -368,10 +385,11 @@ const EarthquakeMap: React.FC<MapProps> = ({
                     </PopupFixed>
                 )}
              </Marker>
-        ))}
+             );
+        })}
 
-        {/* MUSEUM MODE MARKER */}
-        {viewMode === 'museum' && activeLegend && (
+        {/* MUSEUM MODE MARKER - Hide when Idle */}
+        {viewMode === 'museum' && !isIdle && activeLegend && !isNaN(activeLegend.coords[0]) && (
             <React.Fragment>
                 <Circle 
                     center={activeLegend.coords}
@@ -406,8 +424,8 @@ const EarthquakeMap: React.FC<MapProps> = ({
             </React.Fragment>
         )}
         
-        {/* LAB: IMPACT SIMULATION */}
-        {viewMode === 'lab' && labTab === 'impact' && labState.location && (
+        {/* LAB: IMPACT SIMULATION - Hide when Idle */}
+        {viewMode === 'lab' && !isIdle && labTab === 'impact' && labState.location && (
             <React.Fragment>
                 <Marker position={labState.location} icon={groundZeroIcon} />
                 <Circle 
@@ -462,8 +480,8 @@ const EarthquakeMap: React.FC<MapProps> = ({
             </React.Fragment>
         )}
 
-        {/* LAB: WAVE SIMULATION */}
-        {viewMode === 'lab' && labTab === 'wave' && (
+        {/* LAB: WAVE SIMULATION - Hide when Idle */}
+        {viewMode === 'lab' && !isIdle && labTab === 'wave' && (
             <React.Fragment>
                 {/* Station */}
                 {waveSim.station && (
