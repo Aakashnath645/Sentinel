@@ -1,11 +1,12 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { EarthquakeFeature, LegendEvent } from '../types';
-import { Activity, Radio, Clock, MapPin, Search, Database, BarChart3, Wifi, Waves, Navigation, AlertTriangle, PanelLeftClose, PanelLeftOpen, Landmark, Skull, Beaker, Zap, Layers, Play, RotateCcw, Target, MousePointer2, ClipboardCheck, ShieldAlert, CheckSquare, Siren, Hammer, ChevronRight, LineChart, AlertOctagon } from 'lucide-react';
+import { EarthquakeFeature, LegendEvent, VolcanoFeature } from '../types';
+import { Activity, Radio, Clock, MapPin, Search, Database, BarChart3, Wifi, Waves, Navigation, AlertTriangle, PanelLeftClose, PanelLeftOpen, Landmark, Skull, Beaker, Zap, Layers, Play, RotateCcw, Target, MousePointer2, ClipboardCheck, ShieldAlert, CheckSquare, Siren, Hammer, ChevronRight, LineChart, AlertOctagon, Flame, Mountain } from 'lucide-react';
 
 interface SidebarProps {
-  viewMode: 'live' | 'museum' | 'lab' | 'protocols';
-  onViewModeChange: (mode: 'live' | 'museum' | 'lab' | 'protocols') => void;
+  viewMode: 'live' | 'museum' | 'lab' | 'protocols' | 'magma';
+  onViewModeChange: (mode: 'live' | 'museum' | 'lab' | 'protocols' | 'magma') => void;
   earthquakes: EarthquakeFeature[];
+  volcanoes: VolcanoFeature[];
   onSelect: (id: string, feature: EarthquakeFeature) => void;
   selectedId: string | null;
   lastUpdated: Date;
@@ -60,7 +61,8 @@ const formatEnergy = (joules: number) => {
 const Sidebar: React.FC<SidebarProps> = ({ 
     viewMode,
     onViewModeChange,
-    earthquakes, 
+    earthquakes,
+    volcanoes, 
     onSelect, 
     selectedId, 
     lastUpdated, 
@@ -274,6 +276,9 @@ const Sidebar: React.FC<SidebarProps> = ({
       } else if (color === "green") {
           activeClasses = "bg-green-900/30 text-green-400 border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.3)]";
           indicatorColor = "bg-green-500";
+      } else if (color === "orange") {
+          activeClasses = "bg-orange-900/30 text-orange-400 border-orange-500/50 shadow-[0_0_10px_rgba(249,115,22,0.3)]";
+          indicatorColor = "bg-orange-500";
       }
 
       return (
@@ -319,6 +324,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex flex-col gap-3 w-full items-center">
               <NavButton id="live" icon={Wifi} color="cyan" label="Live Feed" />
               <NavButton id="museum" icon={Landmark} color="red" label="Archive" />
+              <NavButton id="magma" icon={Flame} color="orange" label="Magma Monitor" />
               <NavButton id="lab" icon={Beaker} color="purple" label="Sim Lab" />
               <NavButton id="protocols" icon={ShieldAlert} color="green" label="Protocols" />
           </div>
@@ -335,18 +341,26 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* --- MOBILE NAVIGATION TABS (Visible only on small screens) --- */}
-      <div className="md:hidden flex border-b border-slate-800 flex-none">
+      <div className="md:hidden flex border-b border-slate-800 flex-none overflow-x-auto no-scrollbar">
              <button 
                 onClick={() => onViewModeChange('live')}
-                className={`flex-1 py-3 text-[10px] font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
+                className={`flex-1 min-w-[60px] py-3 text-[10px] font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
                     viewMode === 'live' ? 'bg-slate-900 text-cyan-400 border-b-2 border-cyan-400' : 'bg-slate-950 text-slate-500'
                 }`}
              >
                  <Wifi className="w-3 h-3" /> Live
              </button>
              <button 
+                onClick={() => onViewModeChange('magma')}
+                className={`flex-1 min-w-[60px] py-3 text-[10px] font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
+                    viewMode === 'magma' ? 'bg-slate-900 text-orange-400 border-b-2 border-orange-500' : 'bg-slate-950 text-slate-500'
+                }`}
+             >
+                 <Flame className="w-3 h-3" /> Magma
+             </button>
+             <button 
                 onClick={() => onViewModeChange('museum')}
-                className={`flex-1 py-3 text-[10px] font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
+                className={`flex-1 min-w-[60px] py-3 text-[10px] font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
                     viewMode === 'museum' ? 'bg-slate-900 text-red-400 border-b-2 border-red-500' : 'bg-slate-950 text-slate-500'
                 }`}
              >
@@ -354,7 +368,7 @@ const Sidebar: React.FC<SidebarProps> = ({
              </button>
              <button 
                 onClick={() => onViewModeChange('lab')}
-                className={`flex-1 py-3 text-[10px] font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
+                className={`flex-1 min-w-[60px] py-3 text-[10px] font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
                     viewMode === 'lab' ? 'bg-slate-900 text-purple-400 border-b-2 border-purple-500' : 'bg-slate-950 text-slate-500'
                 }`}
              >
@@ -362,7 +376,7 @@ const Sidebar: React.FC<SidebarProps> = ({
              </button>
              <button 
                 onClick={() => onViewModeChange('protocols')}
-                className={`flex-1 py-3 text-[10px] font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
+                className={`flex-1 min-w-[60px] py-3 text-[10px] font-bold font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
                     viewMode === 'protocols' ? 'bg-slate-900 text-green-400 border-b-2 border-green-500' : 'bg-slate-950 text-slate-500'
                 }`}
              >
@@ -541,6 +555,58 @@ const Sidebar: React.FC<SidebarProps> = ({
                 )}
             </div>
         </>
+        )}
+
+        {viewMode === 'magma' && (
+            <div className="flex-1 overflow-y-auto bg-slate-950/80 p-6 flex flex-col relative animate-fadeIn">
+                <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                     <Flame className="w-48 h-48 text-orange-500" />
+                </div>
+                
+                <div className="relative z-10 space-y-6">
+                    <div>
+                        <div className="flex items-center gap-2 text-orange-500 mb-2">
+                            <Flame className="w-4 h-4" />
+                            <span className="text-[10px] font-bold tracking-[0.3em] uppercase">Magma Monitor</span>
+                        </div>
+                        <h2 className="text-2xl font-bold text-white font-mono leading-tight">ACTIVE VOLCANOES</h2>
+                        <p className="text-xs text-orange-400/80 font-mono mt-2">Currently erupting or significant restless volcanoes.</p>
+                    </div>
+
+                    <div className="bg-slate-900/50 border border-slate-800 p-2">
+                        {volcanoes.length === 0 ? (
+                            <div className="text-center p-4 text-slate-500 text-xs">Loading geological data...</div>
+                        ) : (
+                            <div className="grid gap-3">
+                                {volcanoes.map(v => (
+                                    <div key={v.id} className="bg-slate-950 border border-slate-800 hover:border-orange-500/50 p-3 flex items-center justify-between group transition-all">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-orange-950/30 border border-orange-500/30 flex items-center justify-center text-orange-500">
+                                                <Mountain className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-sm font-bold text-slate-200 group-hover:text-orange-400 uppercase">{v.name}</h3>
+                                                <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                                                    <MapPin className="w-3 h-3" /> {v.location}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-orange-900/20 text-orange-400 border border-orange-500/20 text-[9px] font-bold uppercase tracking-wider animate-pulse">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                                                {v.status}
+                                            </div>
+                                            <div className="text-[9px] text-slate-600 mt-1 font-mono">
+                                                Elev: {v.elevation}m
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
         )}
 
         {viewMode === 'museum' && (
@@ -1062,7 +1128,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {/* Footer / Credits */}
         <div className="flex-none p-3 border-t border-slate-800 bg-slate-950 text-center">
             <p className="text-[9px] text-slate-700 font-mono tracking-widest uppercase">
-                {viewMode === 'live' ? 'USGS SEISMIC FEED // SECURE LINK' : viewMode === 'museum' ? 'HISTORICAL ARCHIVE // READ ONLY' : viewMode === 'lab' ? 'SIMULATION ENVIRONMENT // UNCLASSIFIED' : 'CIVIL DEFENSE PROTOCOLS'}
+                {viewMode === 'live' ? 'USGS SEISMIC FEED // SECURE LINK' : viewMode === 'museum' ? 'HISTORICAL ARCHIVE // READ ONLY' : viewMode === 'magma' ? 'MAGMA MONITOR // ACTIVE' : viewMode === 'lab' ? 'SIMULATION ENVIRONMENT // UNCLASSIFIED' : 'CIVIL DEFENSE PROTOCOLS'}
             </p>
         </div>
       </div>

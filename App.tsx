@@ -4,9 +4,9 @@ import EarthquakeMap from './components/EarthquakeMap';
 import AnalysisModal from './components/AnalysisModal';
 import MuseumSlider from './components/MuseumSlider';
 import SplashScreen from './components/SplashScreen';
-import { fetchEarthquakes } from './services/usgs';
+import { fetchEarthquakes, fetchVolcanoes } from './services/usgs';
 import { LEGENDS } from './data/legends';
-import { EarthquakeFeature, USGSGeoJSON } from './types';
+import { EarthquakeFeature, USGSGeoJSON, VolcanoFeature } from './types';
 import { Loader2, AlertCircle, Scan, Map as MapIcon, Globe } from 'lucide-react';
 
 // --- Sound Utility ---
@@ -57,6 +57,7 @@ const PATROL_INTERVAL = 10000; // 10 seconds
 const App: React.FC = () => {
   const [showSplash, setShowSplash] = useState(true);
   const [earthquakes, setEarthquakes] = useState<EarthquakeFeature[]>([]);
+  const [volcanoes, setVolcanoes] = useState<VolcanoFeature[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -76,7 +77,7 @@ const App: React.FC = () => {
   const [modalQuake, setModalQuake] = useState<EarthquakeFeature | null>(null);
 
   // View Mode State
-  const [viewMode, setViewMode] = useState<'live' | 'museum' | 'lab' | 'protocols'>('live');
+  const [viewMode, setViewMode] = useState<'live' | 'museum' | 'lab' | 'protocols' | 'magma'>('live');
   const [currentLegendIndex, setCurrentLegendIndex] = useState(0);
 
   // Lab State
@@ -181,6 +182,13 @@ const App: React.FC = () => {
     } finally {
       if (!isSilent) setLoading(false);
     }
+  }, []);
+
+  // Fetch Volcanoes
+  useEffect(() => {
+      fetchVolcanoes().then(data => {
+          setVolcanoes(data);
+      });
   }, []);
 
   // Initial fetch, Poll, and Geolocation
@@ -317,6 +325,7 @@ const App: React.FC = () => {
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               earthquakes={filteredEarthquakes} 
+              volcanoes={volcanoes}
               onSelect={handleSelect} 
               selectedId={selectedId}
               lastUpdated={lastUpdated}
@@ -343,6 +352,7 @@ const App: React.FC = () => {
               viewMode === 'live' ? 'bg-gradient-to-r from-cyan-900/0 via-cyan-500/50 to-cyan-900/0' 
               : viewMode === 'museum' ? 'bg-gradient-to-r from-red-900/0 via-red-500/50 to-red-900/0'
               : viewMode === 'lab' ? 'bg-gradient-to-r from-purple-900/0 via-purple-500/50 to-purple-900/0'
+              : viewMode === 'magma' ? 'bg-gradient-to-r from-orange-900/0 via-orange-500/50 to-orange-900/0'
               : 'bg-gradient-to-r from-green-900/0 via-green-500/50 to-green-900/0'
           }`} />
 
@@ -369,7 +379,8 @@ const App: React.FC = () => {
               )}
 
               <EarthquakeMap 
-                  earthquakes={filteredEarthquakes} 
+                  earthquakes={filteredEarthquakes}
+                  volcanoes={volcanoes}
                   selectedId={selectedId}
                   onSelect={handleSelect}
                   onAnalyze={handleAnalyze}
@@ -435,7 +446,8 @@ const App: React.FC = () => {
               <Sidebar 
                   viewMode={viewMode}
                   onViewModeChange={setViewMode}
-                  earthquakes={filteredEarthquakes} 
+                  earthquakes={filteredEarthquakes}
+                  volcanoes={volcanoes}
                   onSelect={handleSelect} 
                   selectedId={selectedId}
                   lastUpdated={lastUpdated}

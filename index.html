@@ -83,6 +83,17 @@
         stroke-width: 3;
       }
 
+      /* --- MAGMA / VOLCANO ANIMATION --- */
+      @keyframes magma-burn {
+        0% { box-shadow: 0 0 5px #f97316; background-color: #fb923c; }
+        50% { box-shadow: 0 0 20px #c2410c, 0 0 10px #f97316; background-color: #fff7ed; }
+        100% { box-shadow: 0 0 5px #f97316; background-color: #fb923c; }
+      }
+
+      .volcano-icon-marker {
+        animation: magma-burn 3s infinite ease-in-out;
+      }
+
       /* --- CYBER UI ELEMENTS --- */
       
       /* Scanline texture */

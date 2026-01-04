@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Circle, Popup, useMap, AttributionControl, GeoJSON, useMapEvents, Marker } from 'react-leaflet';
-import { EarthquakeFeature, LegendEvent } from '../types';
+import { EarthquakeFeature, LegendEvent, VolcanoFeature } from '../types';
 import { fetchTectonicPlates } from '../services/usgs';
-import { Activity, Radio, Waves, ScanLine, Beaker, MapPin } from 'lucide-react';
+import { Activity, Radio, Waves, ScanLine, Beaker, MapPin, Flame } from 'lucide-react';
 import L from 'leaflet';
 
 interface MapProps {
   earthquakes: EarthquakeFeature[];
+  volcanoes: VolcanoFeature[];
   selectedId: string | null;
   onSelect: (id: string, feature: EarthquakeFeature) => void;
   onAnalyze: (feature: EarthquakeFeature) => void;
-  viewMode: 'live' | 'museum' | 'lab' | 'protocols';
+  viewMode: 'live' | 'museum' | 'lab' | 'protocols' | 'magma';
   activeLegend: LegendEvent | null;
   labState: { mag: number; depth: number; location: { lat: number; lng: number } | null };
   labTab: 'impact' | 'wave' | 'forecast';
@@ -31,14 +32,7 @@ const TileLayerFixed = TileLayer as any;
 const GeoJSONFixed = GeoJSON as any;
 const PopupFixed = Popup as any;
 
-// Custom Icons for Lab Mode
-const createLabIcon = (color: string) => L.divIcon({
-    className: 'custom-div-icon',
-    html: `<div style="background-color: ${color}; width: 12px; height: 12px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px ${color};"></div>`,
-    iconSize: [12, 12],
-    iconAnchor: [6, 6]
-});
-
+// Custom Icons
 const stationIcon = L.divIcon({
     className: 'custom-div-icon',
     html: `<div style="background-color: #3b82f6; width: 16px; height: 16px; border: 2px solid white; border-radius: 2px; box-shadow: 0 0 10px #3b82f6;"></div>`,
@@ -58,6 +52,14 @@ const groundZeroIcon = L.divIcon({
     html: `<div style="background-color: #a855f7; width: 16px; height: 16px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 15px #a855f7;" class="animate-pulse"></div>`,
     iconSize: [16, 16],
     iconAnchor: [8, 8]
+});
+
+// Volcano Icon (Orange Triangle / Fire)
+const volcanoIcon = L.divIcon({
+    className: 'custom-div-icon',
+    html: `<div class="volcano-icon-marker" style="width: 14px; height: 14px; border: 2px solid white; border-radius: 50%;"></div>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7]
 });
 
 
@@ -116,11 +118,12 @@ const MapClickHandler: React.FC<{ onMapClick: (latlng: {lat: number, lng: number
 const MapController: React.FC<{ 
     selectedId: string | null; 
     earthquakes: EarthquakeFeature[];
-    viewMode: 'live' | 'museum' | 'lab' | 'protocols';
+    viewMode: 'live' | 'museum' | 'lab' | 'protocols' | 'magma';
     activeLegend: LegendEvent | null;
     isIdle: boolean;
     patrolTarget: EarthquakeFeature | null;
-}> = ({ selectedId, earthquakes, viewMode, activeLegend, isIdle, patrolTarget }) => {
+    volcanoes: VolcanoFeature[];
+}> = ({ selectedId, earthquakes, viewMode, activeLegend, isIdle, patrolTarget, volcanoes }) => {
   const map = useMap();
 
   useEffect(() => {
@@ -159,13 +162,17 @@ const MapController: React.FC<{
     else if (viewMode === 'protocols') {
          map.flyTo([20, 0], 2.5, { animate: true, duration: 1.5 });
     }
+    // 5. Magma Monitor (Global View initially)
+    else if (viewMode === 'magma') {
+        map.flyTo([20, 0], 2.5, { animate: true, duration: 1.5 });
+    }
   }, [selectedId, earthquakes, map, viewMode, activeLegend, isIdle, patrolTarget]);
 
   return null;
 };
 
 const EarthquakeMap: React.FC<MapProps> = ({ 
-    earthquakes, selectedId, onSelect, onAnalyze, viewMode, activeLegend, labState, labTab, waveSim, onMapClick, isIdle, patrolTarget
+    earthquakes, volcanoes, selectedId, onSelect, onAnalyze, viewMode, activeLegend, labState, labTab, waveSim, onMapClick, isIdle, patrolTarget
 }) => {
   const [tectonicPlates, setTectonicPlates] = useState<any>(null);
   
@@ -236,6 +243,7 @@ const EarthquakeMap: React.FC<MapProps> = ({
             activeLegend={activeLegend}
             isIdle={isIdle}
             patrolTarget={patrolTarget}
+            volcanoes={volcanoes}
         />
 
         {/* LIVE MODE MARKERS */}
@@ -323,6 +331,44 @@ const EarthquakeMap: React.FC<MapProps> = ({
               </React.Fragment>
             );
         })}
+
+        {/* MAGMA MONITOR MARKERS */}
+        {viewMode === 'magma' && volcanoes.map((volcano) => (
+             <Marker 
+                key={volcano.id} 
+                position={volcano.coordinates} 
+                icon={volcanoIcon}
+             >
+                {!isIdle && (
+                    <PopupFixed className="custom-popup" closeButton={false} maxWidth={300}>
+                        <div className="font-mono text-slate-200">
+                            <div className="flex items-center gap-2 mb-2 text-orange-500">
+                                <Flame className="w-4 h-4" />
+                                <h3 className="font-bold text-sm uppercase">{volcano.name}</h3>
+                            </div>
+                            <div className="text-xs text-slate-400 space-y-2">
+                                <div className="flex justify-between border-b border-orange-900/30 pb-1">
+                                    <span className="uppercase tracking-widest text-[9px]">Location</span>
+                                    <span className="text-slate-300">{volcano.location}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-orange-900/30 pb-1">
+                                    <span className="uppercase tracking-widest text-[9px]">Status</span>
+                                    <span className="text-orange-400 font-bold animate-pulse">{volcano.status}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-orange-900/30 pb-1">
+                                    <span className="uppercase tracking-widest text-[9px]">Activity</span>
+                                    <span className="text-slate-300">{volcano.lastEruption}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="uppercase tracking-widest text-[9px]">Type</span>
+                                    <span className="text-slate-300">{volcano.type}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </PopupFixed>
+                )}
+             </Marker>
+        ))}
 
         {/* MUSEUM MODE MARKER */}
         {viewMode === 'museum' && activeLegend && (

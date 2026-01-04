@@ -1,3 +1,4 @@
+
 export interface EarthquakeProperties {
   mag: number;
   place: string;
@@ -50,6 +51,17 @@ export interface USGSGeoJSON {
     count: number;
   };
   features: EarthquakeFeature[];
+}
+
+export interface VolcanoFeature {
+    id: string;
+    name: string;
+    location: string;
+    coordinates: [number, number]; // Lat, Lng
+    status: 'Erupting' | 'Unrest' | 'Minor Activity';
+    lastEruption: string;
+    elevation: number;
+    type: string;
 }
 
 export interface GroundingChunk {
