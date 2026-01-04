@@ -504,9 +504,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 )}
 
                                 {quake.properties.tsunami === 1 && (
-                                    <div className="flex items-center gap-1.5 ml-5 mb-1 text-cyan-400 animate-pulse">
-                                        <Waves className="w-3 h-3" />
-                                        <span className="text-[10px] font-bold tracking-wider uppercase">TSUNAMI WARNING</span>
+                                    <div className="flex items-center gap-1.5 ml-5 mb-1 bg-cyan-950/40 border border-cyan-500/50 px-2 py-0.5 rounded-sm w-fit animate-pulse">
+                                        <Waves className="w-3 h-3 text-cyan-400" />
+                                        <span className="text-[10px] font-bold tracking-wider uppercase text-cyan-100">TSUNAMI WARNING</span>
                                     </div>
                                 )}
 
@@ -846,25 +846,33 @@ const Sidebar: React.FC<SidebarProps> = ({
                                     {Object.entries(analyticsData.distribution).map(([key, rawCount]) => {
                                         const count = rawCount as number;
                                         const values = Object.values(analyticsData.distribution) as number[];
-                                        const max = Math.max(...values);
-                                        const height = max > 0 ? (count / max) * 100 : 0;
+                                        const max = Math.max(...values, 1);
+                                        const height = (count / max) * 100;
                                         
                                         // Colors based on magnitude range logic
-                                        let bg = 'bg-slate-700';
+                                        let bg = 'bg-slate-600';
                                         if (key === 'minor') bg = 'bg-emerald-500';
                                         if (key === 'light') bg = 'bg-yellow-500';
                                         if (key === 'moderate') bg = 'bg-orange-500';
                                         if (key === 'strong') bg = 'bg-red-500';
 
                                         return (
-                                            <div key={key} className="flex-1 flex flex-col items-center gap-1 group">
-                                                <div 
-                                                    className={`w-full rounded-t-sm transition-all duration-500 ${bg} opacity-80 group-hover:opacity-100`} 
-                                                    style={{ height: `${Math.max(height, 5)}%` }}
-                                                ></div>
-                                                <span className="text-[9px] text-slate-500 uppercase font-mono">{key.slice(0, 3)}</span>
-                                                <div className="absolute -mt-6 text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 px-1 rounded border border-slate-700">
-                                                    {count}
+                                            <div key={key} className="flex-1 h-full flex flex-col items-center group">
+                                                {/* Bar Area */}
+                                                <div className="flex-1 w-full flex items-end justify-center relative">
+                                                    <div 
+                                                        className={`w-full rounded-t-sm transition-all duration-500 ${bg} opacity-80 group-hover:opacity-100 relative`} 
+                                                        style={{ height: `${Math.max(height, 2)}%` }}
+                                                    >
+                                                        {/* Tooltip */}
+                                                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 px-1 rounded border border-slate-700 pointer-events-none z-20 whitespace-nowrap">
+                                                            {count}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {/* Label */}
+                                                <div className="h-4 flex items-center justify-center mt-1">
+                                                    <span className="text-[9px] text-slate-500 uppercase font-mono">{key.slice(0, 3)}</span>
                                                 </div>
                                             </div>
                                         );

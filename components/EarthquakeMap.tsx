@@ -285,9 +285,9 @@ const EarthquakeMap: React.FC<MapProps> = ({
                                 <h3 className="font-bold text-cyan-50 text-xs uppercase leading-snug tracking-wider">{quake.properties.place}</h3>
                             </div>
                             {isTsunami && (
-                                <div className="mb-3 bg-cyan-950/50 border border-cyan-500/50 p-2 flex items-center gap-2 animate-pulse">
+                                <div className="mb-3 bg-cyan-950/80 border border-cyan-400 p-2 flex items-center justify-center gap-2 animate-pulse shadow-[0_0_15px_rgba(6,182,212,0.4)]">
                                     <Waves className="w-4 h-4 text-cyan-400" />
-                                    <span className="text-xs font-bold text-cyan-100 uppercase tracking-widest">Tsunami Warning</span>
+                                    <span className="text-xs font-bold text-cyan-50 uppercase tracking-widest">TSUNAMI WARNING</span>
                                 </div>
                             )}
                             <div className="grid grid-cols-2 gap-4 text-xs text-slate-400 mb-4">
