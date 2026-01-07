@@ -19,10 +19,10 @@ export const fetchISSPosition = async (): Promise<ISSPosition | null> => {
         return {
             latitude: data.latitude,
             longitude: data.longitude,
-            altitude: data.altitude,
-            velocity: data.velocity,
-            visibility: data.visibility,
-            timestamp: data.timestamp
+            altitude: typeof data.altitude === 'number' ? data.altitude : 0,
+            velocity: typeof data.velocity === 'number' ? data.velocity : 0,
+            visibility: data.visibility || 'unknown',
+            timestamp: data.timestamp || Date.now()
         };
     } catch (e) {
         console.error("ISS Fetch Error", e);

@@ -285,11 +285,11 @@ const EarthquakeMap: React.FC<MapProps> = ({
                                 <div className="text-xs space-y-1 text-slate-300">
                                     <div className="flex justify-between border-b border-slate-700 pb-1">
                                         <span className="uppercase text-[9px] tracking-wider text-slate-500">Altitude</span>
-                                        <span className="font-bold">{issPosition.altitude.toFixed(1)} km</span>
+                                        <span className="font-bold">{(issPosition.altitude || 0).toFixed(1)} km</span>
                                     </div>
                                     <div className="flex justify-between border-b border-slate-700 pb-1">
                                         <span className="uppercase text-[9px] tracking-wider text-slate-500">Velocity</span>
-                                        <span className="font-bold">{issPosition.velocity.toFixed(0)} km/h</span>
+                                        <span className="font-bold">{(issPosition.velocity || 0).toFixed(0)} km/h</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="uppercase text-[9px] tracking-wider text-slate-500">Visibility</span>
@@ -315,7 +315,7 @@ const EarthquakeMap: React.FC<MapProps> = ({
             // Safety Check for Invalid Coordinates to prevent Leaflet crash
             if (!isValidLatLng(lat, lng)) return null;
 
-            const mag = quake.properties.mag;
+            const mag = quake.properties.mag || 0;
             const isSelected = selectedId === quake.id;
             const isTsunami = quake.properties.tsunami === 1;
             // Highlight current patrol target if idle
@@ -513,7 +513,7 @@ const EarthquakeMap: React.FC<MapProps> = ({
                                 <div className="text-xs space-y-1">
                                     <div className="flex justify-between">
                                         <span className="text-slate-500">Magnitude:</span>
-                                        <span className="font-bold text-purple-300">{labState.mag.toFixed(1)}</span>
+                                        <span className="font-bold text-purple-300">{(labState.mag || 0).toFixed(1)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-slate-500">Depth:</span>

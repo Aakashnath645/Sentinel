@@ -12,6 +12,35 @@ export const fetchEarthquakes = async (): Promise<USGSGeoJSON> => {
       throw new Error(`Status: ${response.status} ${response.statusText}`);
     }
     const data: USGSGeoJSON = await response.json();
+    
+    // SANITIZE DATA: Filter invalid entries and ensure numbers are numbers
+    data.features = data.features
+        .filter(f => f.geometry && f.geometry.coordinates && f.properties)
+        .map(f => {
+            // Ensure mag is a number, default to 0 if null
+            const safeMag = (typeof f.properties.mag === 'number') ? f.properties.mag : 0;
+            
+            // Ensure coordinates exist
+            const safeCoords = [
+                f.geometry.coordinates[0] || 0,
+                f.geometry.coordinates[1] || 0,
+                f.geometry.coordinates[2] || 0
+            ] as [number, number, number];
+
+            return {
+                ...f,
+                properties: {
+                    ...f.properties,
+                    mag: safeMag,
+                    place: f.properties.place || 'Unknown Location'
+                },
+                geometry: {
+                    ...f.geometry,
+                    coordinates: safeCoords
+                }
+            };
+        });
+
     return data;
   } catch (error) {
     console.error("USGS Fetch Error:", error);

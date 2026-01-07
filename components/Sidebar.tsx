@@ -73,7 +73,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   // Stats Calculation
   const totalEvents = earthquakes.length;
-  const maxMag = earthquakes.reduce((max, q) => (q.properties.mag > max ? q.properties.mag : max), 0);
+  // Fallback 0 to max calculation
+  const maxMag = earthquakes.reduce((max, q) => ((q.properties.mag || 0) > max ? q.properties.mag : max), 0);
   
   // -- FORECAST/ANALYTICS CALCULATIONS --
   const analyticsData = useMemo(() => {
@@ -82,12 +83,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     // 1. Total Energy
     let totalEnergyJoules = 0;
     earthquakes.forEach(q => {
-        totalEnergyJoules += calculateEnergy(q.properties.mag);
+        totalEnergyJoules += calculateEnergy(q.properties.mag || 0);
     });
 
     // 2. Mainshock
     const mainshock = earthquakes.reduce((prev, current) => 
-        (prev.properties.mag > current.properties.mag) ? prev : current
+        ((prev.properties.mag || 0) > (current.properties.mag || 0)) ? prev : current
     );
 
     // 3. Frequency Distribution
@@ -100,7 +101,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     };
 
     earthquakes.forEach(q => {
-        const m = q.properties.mag;
+        const m = q.properties.mag || 0;
         if (m < 3) distribution.micro++;
         else if (m < 4) distribution.minor++;
         else if (m < 5) distribution.light++;
@@ -110,12 +111,13 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     // 4. Forecast Text Generation (Bath's Law / Omori's Law approximation)
     let forecastText = "";
-    if (mainshock.properties.mag < 4.5) {
+    const mainshockMag = mainshock.properties.mag || 0;
+    if (mainshockMag < 4.5) {
         forecastText = "Seismicity levels are currently normal (background level). No significant aftershock sequences are expected based on current data.";
-    } else if (mainshock.properties.mag < 6.0) {
-        forecastText = `A Magnitude ${mainshock.properties.mag.toFixed(1)} event typically generates a short aftershock sequence. Expect several events of Mag ${Math.max(0, mainshock.properties.mag - 1.2).toFixed(1)} or greater in the next 24-48 hours.`;
+    } else if (mainshockMag < 6.0) {
+        forecastText = `A Magnitude ${mainshockMag.toFixed(1)} event typically generates a short aftershock sequence. Expect several events of Mag ${Math.max(0, mainshockMag - 1.2).toFixed(1)} or greater in the next 24-48 hours.`;
     } else {
-        forecastText = `ALERT: Significant energy release detected (M${mainshock.properties.mag.toFixed(1)}). Statistical models (Bath's Law) suggest a high probability of a Mag ${(mainshock.properties.mag - 1.2).toFixed(1)}+ aftershock. Secondary aftershocks may persist for weeks.`;
+        forecastText = `ALERT: Significant energy release detected (M${mainshockMag.toFixed(1)}). Statistical models (Bath's Law) suggest a high probability of a Mag ${(mainshockMag - 1.2).toFixed(1)}+ aftershock. Secondary aftershocks may persist for weeks.`;
     }
 
     return { totalEnergyJoules, mainshock, distribution, forecastText };
@@ -457,6 +459,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <ul className="divide-y divide-slate-800/40 relative z-10">
                     {sortedEarthquakes.map((quake) => {
                         const isLocalAlert = quake.distanceToUser !== null && quake.distanceToUser < 500;
+                        const mag = quake.properties.mag || 0; // Fallback
                         
                         return (
                             <li 
@@ -517,8 +520,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 </div>
                                 </div>
 
-                                <div className={`flex flex-col items-center justify-center w-10 h-10 border bg-slate-950/50 ${getMagColor(quake.properties.mag)}`}>
-                                    <span className="text-sm font-bold font-mono">{quake.properties.mag.toFixed(1)}</span>
+                                <div className={`flex flex-col items-center justify-center w-10 h-10 border bg-slate-950/50 ${getMagColor(mag)}`}>
+                                    <span className="text-sm font-bold font-mono">{mag.toFixed(1)}</span>
                                 </div>
                             </div>
                             </li>
@@ -613,7 +616,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 
                                 <span className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Planetary K-index</span>
                                 <div className="text-7xl font-bold font-mono text-white mb-2 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
-                                    {spaceWeather.kp.toFixed(1)}
+                                    {(spaceWeather.kp || 0).toFixed(1)}
                                 </div>
                                 
                                 <div className={`px-3 py-1 rounded border text-xs font-bold uppercase tracking-[0.2em] mb-4 ${
@@ -633,7 +636,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 
                                 <div className="flex justify-between items-end gap-1 h-32 px-2 pb-2 border-b border-slate-700">
                                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((level) => {
-                                        const isActive = spaceWeather.kp >= level;
+                                        const isActive = (spaceWeather.kp || 0) >= level;
                                         // Colors: 1-3 Green, 4 Yellow, 5+ Red
                                         let barColor = 'bg-slate-800';
                                         let glow = '';

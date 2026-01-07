@@ -456,7 +456,7 @@ const App: React.FC = () => {
                               <div className="flex justify-center gap-8 text-slate-300 font-mono text-xs md:text-sm tracking-wider">
                                   <div className="flex items-center gap-2">
                                       <span className="text-slate-500">MAG</span>
-                                      <span className="text-cyan-400 font-bold text-lg">{currentPatrolTarget.properties.mag.toFixed(1)}</span>
+                                      <span className="text-cyan-400 font-bold text-lg">{(currentPatrolTarget.properties.mag || 0).toFixed(1)}</span>
                                   </div>
                                   <div className="flex items-center gap-2">
                                       <span className="text-slate-500">DEPTH</span>
@@ -464,7 +464,7 @@ const App: React.FC = () => {
                                   </div>
                                   <div className="flex items-center gap-2">
                                         <Globe className="w-3 h-3 text-slate-500" />
-                                        <span className="text-slate-400">{currentPatrolTarget.geometry.coordinates[1].toFixed(2)}, {currentPatrolTarget.geometry.coordinates[0].toFixed(2)}</span>
+                                        <span className="text-slate-400">{(currentPatrolTarget.geometry.coordinates[1] || 0).toFixed(2)}, {(currentPatrolTarget.geometry.coordinates[0] || 0).toFixed(2)}</span>
                                   </div>
                               </div>
                           </div>
