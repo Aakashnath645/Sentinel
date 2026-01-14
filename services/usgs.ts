@@ -13,19 +13,30 @@ export const fetchEarthquakes = async (): Promise<USGSGeoJSON> => {
     }
     const data: USGSGeoJSON = await response.json();
     
-    // SANITIZE DATA: Filter invalid entries and ensure numbers are numbers
+    // SANITIZE DATA: Filter invalid entries and ensure numbers are numbers (and not NaN)
     data.features = data.features
         .filter(f => f.geometry && f.geometry.coordinates && f.properties)
         .map(f => {
-            // Ensure mag is a number, default to 0 if null
-            const safeMag = (typeof f.properties.mag === 'number') ? f.properties.mag : 0;
+            // Ensure mag is a valid number
+            let safeMag = typeof f.properties.mag === 'number' ? f.properties.mag : 0;
+            if (isNaN(safeMag)) safeMag = 0;
             
-            // Ensure coordinates exist
-            const safeCoords = [
-                f.geometry.coordinates[0] || 0,
-                f.geometry.coordinates[1] || 0,
-                f.geometry.coordinates[2] || 0
-            ] as [number, number, number];
+            // Ensure coordinates exist and are valid numbers
+            let lng = f.geometry.coordinates[0];
+            let lat = f.geometry.coordinates[1];
+            let depth = f.geometry.coordinates[2];
+
+            // Convert to float if string, default to 0 if invalid
+            if (typeof lng !== 'number') lng = parseFloat(lng as any);
+            if (typeof lat !== 'number') lat = parseFloat(lat as any);
+            if (typeof depth !== 'number') depth = parseFloat(depth as any);
+
+            // Final NaN check
+            if (isNaN(lng)) lng = 0;
+            if (isNaN(lat)) lat = 0;
+            if (isNaN(depth)) depth = 0;
+
+            const safeCoords = [lng, lat, depth] as [number, number, number];
 
             return {
                 ...f,
