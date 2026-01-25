@@ -125,17 +125,23 @@ const App: React.FC = () => {
       if (!isSilent) setLoading(true);
       const data: USGSGeoJSON = await fetchEarthquakes();
       
-      if (!isInitialLoadRef.current) {
-          const newMajorQuakes = data.features.filter(f => {
-              const isMajor = f.properties.mag >= 5.0;
-              const isNew = !previousIdsRef.current.has(f.id);
-              return isMajor && isNew;
-          });
-          if (newMajorQuakes.length > 0) playSonarPing();
+      const nextIds = new Set<string>();
+      let hasNewMajorQuake = false;
+
+      for (const f of data.features) {
+          nextIds.add(f.id);
+          if (!isInitialLoadRef.current && !hasNewMajorQuake) {
+              if (f.properties.mag >= 5.0 && !previousIdsRef.current.has(f.id)) {
+                  hasNewMajorQuake = true;
+              }
+          }
       }
 
-      const currentIds = new Set(data.features.map(f => f.id));
-      previousIdsRef.current = currentIds;
+      if (hasNewMajorQuake) {
+          playSonarPing();
+      }
+
+      previousIdsRef.current = nextIds;
       isInitialLoadRef.current = false;
       const sorted = data.features.sort((a, b) => b.properties.time - a.properties.time);
       setEarthquakes(sorted);
