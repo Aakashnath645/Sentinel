@@ -10,27 +10,7 @@ import { fetchISSPosition } from './services/iss';
 import { LEGENDS } from './data/legends';
 import { EarthquakeFeature, USGSGeoJSON, VolcanoFeature, SpaceWeather, ISSPosition } from './types';
 import { Loader2, AlertCircle, Scan, Globe } from 'lucide-react';
-
-const playSonarPing = () => {
-    try {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        if (!AudioContext) return;
-        const ctx = new AudioContext();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1200, ctx.currentTime);
-        gain.gain.setValueAtTime(0, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
-        osc.start();
-        osc.stop(ctx.currentTime + 1.5);
-    } catch (e) {
-        console.error("Audio play failed", e);
-    }
-};
+import { playSonarPing } from './utils/audio';
 
 interface WaveSimState {
     station: { lat: number; lng: number } | null;

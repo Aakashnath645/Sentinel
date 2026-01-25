@@ -29,13 +29,6 @@ interface MapProps {
   issPath: [number, number][];
 }
 
-// Fix for React Leaflet type issues
-const MapContainerFixed = MapContainer as any;
-const TileLayerFixed = TileLayer as any;
-const GeoJSONFixed = GeoJSON as any;
-const PopupFixed = Popup as any;
-const PolylineFixed = Polyline as any;
-
 // Custom Icons
 const stationIcon = L.divIcon({
     className: 'custom-div-icon',
@@ -85,10 +78,10 @@ const shiftGeoJSON = (data: any) => {
     const newFeatures: any[] = [];
     data.features.forEach((feature: any) => {
         newFeatures.push(feature);
-        const right = JSON.parse(JSON.stringify(feature));
+        const right = structuredClone(feature);
         shiftCoords(right.geometry, 360);
         newFeatures.push(right);
-        const left = JSON.parse(JSON.stringify(feature));
+        const left = structuredClone(feature);
         shiftCoords(left.geometry, -360);
         newFeatures.push(left);
     });
@@ -282,7 +275,7 @@ const WrappedQuakeMarkerBase: React.FC<WrappedQuakeMarkerProps> = ({
                     >
                         {/* Only show Popup on the main marker to avoid duplicate popup issues/clutter, or show on all if needed. For performance, strictly showing on 0 offset is better, but user might click ghost. */}
                         {(!isIdle) && ( 
-                            <PopupFixed className="custom-popup" closeButton={false} maxWidth={300}>
+                            <Popup className="custom-popup" closeButton={false} maxWidth={300}>
                             <div className="font-mono text-slate-200">
                                 <div className="flex items-center justify-between gap-3 mb-3 pb-2 border-b border-cyan-900/50">
                                     <h3 className="font-bold text-cyan-50 text-xs uppercase leading-snug tracking-wider">{quake.properties.place}</h3>
@@ -320,7 +313,7 @@ const WrappedQuakeMarkerBase: React.FC<WrappedQuakeMarkerProps> = ({
                                     <span>Initiate AI Analysis</span>
                                 </button>
                             </div>
-                            </PopupFixed>
+                            </Popup>
                         )}
                     </CircleMarker>
                 </React.Fragment>
@@ -353,7 +346,7 @@ const EarthquakeMap: React.FC<MapProps> = ({
 
   return (
     <div className="w-full h-full relative isolate">
-        <MapContainerFixed
+        <MapContainer
         center={[20, 0]}
         zoom={2.5}
         minZoom={2}
@@ -368,13 +361,13 @@ const EarthquakeMap: React.FC<MapProps> = ({
         <MapResizer />
         <MapClickHandler onMapClick={onMapClick} />
         <AttributionControl position="bottomright" prefix={false} />
-        <TileLayerFixed
+        <TileLayer
             attribution='&copy; <a href="https://carto.com/">CARTO</a>'
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
         {tectonicPlates && (
-            <GeoJSONFixed 
+            <GeoJSON
                 data={tectonicPlates}
                 style={{ color: '#22d3ee', weight: 1.5, opacity: 0.3, className: 'tectonic-line' }}
             />
@@ -394,7 +387,7 @@ const EarthquakeMap: React.FC<MapProps> = ({
             <React.Fragment>
                 <Marker position={[issPosition.latitude, issPosition.longitude]} icon={issIcon} zIndexOffset={1000}>
                     {!isIdle && (
-                        <PopupFixed className="custom-popup" closeButton={false} maxWidth={300} autoPan={false}>
+                        <Popup className="custom-popup" closeButton={false} maxWidth={300} autoPan={false}>
                              <div className="font-mono text-slate-200">
                                 <div className="flex items-center gap-2 mb-2 text-white">
                                     <Satellite className="w-4 h-4" />
@@ -415,10 +408,10 @@ const EarthquakeMap: React.FC<MapProps> = ({
                                     </div>
                                 </div>
                              </div>
-                        </PopupFixed>
+                        </Popup>
                     )}
                 </Marker>
-                <PolylineFixed 
+                <Polyline
                     positions={issPath.filter(p => isValidLatLng(p[0], p[1]))} 
                     pathOptions={{ color: 'white', weight: 1, opacity: 0.4, dashArray: '4, 8' }} 
                 />
@@ -443,7 +436,7 @@ const EarthquakeMap: React.FC<MapProps> = ({
              return (
              <Marker key={volcano.id} position={volcano.coordinates} icon={volcanoIcon}>
                 {!isIdle && (
-                    <PopupFixed className="custom-popup" closeButton={false} maxWidth={300}>
+                    <Popup className="custom-popup" closeButton={false} maxWidth={300}>
                         <div className="font-mono text-slate-200">
                             <div className="flex items-center gap-2 mb-2 text-orange-500">
                                 <Flame className="w-4 h-4" />
@@ -468,7 +461,7 @@ const EarthquakeMap: React.FC<MapProps> = ({
                                 </div>
                             </div>
                         </div>
-                    </PopupFixed>
+                    </Popup>
                 )}
              </Marker>
              );
@@ -487,12 +480,12 @@ const EarthquakeMap: React.FC<MapProps> = ({
                     pathOptions={{ color: '#ffffff', weight: 3, fillColor: '#ef4444', fillOpacity: 1 }}
                 >
                      {!isIdle && (
-                        <PopupFixed className="custom-popup" closeButton={false} maxWidth={300}>
+                        <Popup className="custom-popup" closeButton={false} maxWidth={300}>
                             <div className="font-mono text-slate-200">
                                 <h3 className="font-bold text-red-500 text-sm uppercase mb-1">{activeLegend.year} EPICENTER</h3>
                                 <div className="text-xs text-slate-300">{activeLegend.place}</div>
                             </div>
-                        </PopupFixed>
+                        </Popup>
                      )}
                 </CircleMarker>
             </React.Fragment>
@@ -508,7 +501,7 @@ const EarthquakeMap: React.FC<MapProps> = ({
                 />
                 <CircleMarker center={labState.location} radius={10} pathOptions={{ color: '#fff', weight: 2, fillColor: '#a855f7', fillOpacity: 0.8 }}>
                      {!isIdle && (
-                         <PopupFixed className="custom-popup" closeButton={false} maxWidth={300} autoPan={false}>
+                         <Popup className="custom-popup" closeButton={false} maxWidth={300} autoPan={false}>
                              <div className="font-mono text-slate-200">
                                 <div className="flex items-center gap-2 mb-2 text-purple-400">
                                     <Beaker className="w-4 h-4" />
@@ -525,7 +518,7 @@ const EarthquakeMap: React.FC<MapProps> = ({
                                     </div>
                                 </div>
                              </div>
-                         </PopupFixed>
+                         </Popup>
                      )}
                 </CircleMarker>
             </React.Fragment>
@@ -535,12 +528,12 @@ const EarthquakeMap: React.FC<MapProps> = ({
             <React.Fragment>
                 {waveSim.station && isValidLatLng(waveSim.station.lat, waveSim.station.lng) && (
                      <Marker position={waveSim.station} icon={stationIcon}>
-                         {!isIdle && <PopupFixed className="custom-popup" closeButton={false} offset={[0, -10]}><div className="font-mono text-blue-400 font-bold text-xs">SEISMOMETER STATION</div></PopupFixed>}
+                         {!isIdle && <Popup className="custom-popup" closeButton={false} offset={[0, -10]}><div className="font-mono text-blue-400 font-bold text-xs">SEISMOMETER STATION</div></Popup>}
                      </Marker>
                 )}
                 {waveSim.epicenter && isValidLatLng(waveSim.epicenter.lat, waveSim.epicenter.lng) && (
                      <Marker position={waveSim.epicenter} icon={epicenterIcon}>
-                         {!isIdle && <PopupFixed className="custom-popup" closeButton={false} offset={[0, -10]}><div className="font-mono text-red-400 font-bold text-xs">TEST EPICENTER</div></PopupFixed>}
+                         {!isIdle && <Popup className="custom-popup" closeButton={false} offset={[0, -10]}><div className="font-mono text-red-400 font-bold text-xs">TEST EPICENTER</div></Popup>}
                      </Marker>
                 )}
                 {waveSim.epicenter && isValidLatLng(waveSim.epicenter.lat, waveSim.epicenter.lng) && waveSim.pRadius > 0 && !isNaN(waveSim.pRadius) && (
@@ -552,7 +545,7 @@ const EarthquakeMap: React.FC<MapProps> = ({
             </React.Fragment>
         )}
 
-        </MapContainerFixed>
+        </MapContainer>
     </div>
   );
 };
