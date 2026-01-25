@@ -93,7 +93,5 @@ export const fetchVolcanoes = async (): Promise<VolcanoFeature[]> => {
     ];
     
     // Simulating an async fetch
-    return new Promise((resolve) => {
-        setTimeout(() => resolve(volcanoes), 500);
-    });
+    return volcanoes;
 };
