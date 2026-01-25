@@ -221,7 +221,7 @@ const MapController: React.FC<{
 };
 
 // Component to render a quake marker + its ghosts for seamless wrapping
-interface WrappedQuakeMarkerProps {
+export interface WrappedQuakeMarkerProps {
     quake: EarthquakeFeature;
     selectedId: string | null;
     onSelect: (id: string, feature: EarthquakeFeature) => void;
@@ -230,7 +230,7 @@ interface WrappedQuakeMarkerProps {
     patrolTarget: EarthquakeFeature | null;
 }
 
-const WrappedQuakeMarker: React.FC<WrappedQuakeMarkerProps> = ({ 
+const WrappedQuakeMarkerBase: React.FC<WrappedQuakeMarkerProps> = ({
     quake, 
     selectedId, 
     onSelect, 
@@ -328,6 +328,8 @@ const WrappedQuakeMarker: React.FC<WrappedQuakeMarkerProps> = ({
         </>
     );
 };
+
+export const WrappedQuakeMarker = React.memo(WrappedQuakeMarkerBase);
 
 const EarthquakeMap: React.FC<MapProps> = ({ 
     earthquakes, volcanoes, selectedId, onSelect, onAnalyze, viewMode, activeLegend, labState, labTab, waveSim, onMapClick, isIdle, patrolTarget, issPosition, issPath
