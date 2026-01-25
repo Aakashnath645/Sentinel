@@ -85,10 +85,10 @@ const shiftGeoJSON = (data: any) => {
     const newFeatures: any[] = [];
     data.features.forEach((feature: any) => {
         newFeatures.push(feature);
-        const right = JSON.parse(JSON.stringify(feature));
+        const right = structuredClone(feature);
         shiftCoords(right.geometry, 360);
         newFeatures.push(right);
-        const left = JSON.parse(JSON.stringify(feature));
+        const left = structuredClone(feature);
         shiftCoords(left.geometry, -360);
         newFeatures.push(left);
     });
