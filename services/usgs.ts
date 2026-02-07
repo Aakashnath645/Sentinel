@@ -5,8 +5,8 @@ const TECTONIC_PLATES_URL = 'https://raw.githubusercontent.com/fraxen/tectonicpl
 
 export const fetchEarthquakes = async (): Promise<USGSGeoJSON> => {
   try {
-    // Allow browser caching to reduce server load
-    const response = await fetch(USGS_FEED_URL);
+    // Add a timestamp to prevent aggressive browser caching
+    const response = await fetch(`${USGS_FEED_URL}?t=${Date.now()}`);
     
     if (!response.ok) {
       throw new Error(`Status: ${response.status} ${response.statusText}`);
@@ -93,5 +93,7 @@ export const fetchVolcanoes = async (): Promise<VolcanoFeature[]> => {
     ];
     
     // Simulating an async fetch
-    return volcanoes;
+    return new Promise((resolve) => {
+        setTimeout(() => resolve(volcanoes), 500);
+    });
 };

@@ -10,7 +10,27 @@ import { fetchISSPosition } from './services/iss';
 import { LEGENDS } from './data/legends';
 import { EarthquakeFeature, USGSGeoJSON, VolcanoFeature, SpaceWeather, ISSPosition } from './types';
 import { Loader2, AlertCircle, Scan, Globe } from 'lucide-react';
-import { playSonarPing } from './utils/audio';
+
+const playSonarPing = () => {
+    try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1200, ctx.currentTime);
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+        osc.start();
+        osc.stop(ctx.currentTime + 1.5);
+    } catch (e) {
+        console.error("Audio play failed", e);
+    }
+};
 
 interface WaveSimState {
     station: { lat: number; lng: number } | null;
@@ -105,23 +125,17 @@ const App: React.FC = () => {
       if (!isSilent) setLoading(true);
       const data: USGSGeoJSON = await fetchEarthquakes();
       
-      const nextIds = new Set<string>();
-      let hasNewMajorQuake = false;
-
-      for (const f of data.features) {
-          nextIds.add(f.id);
-          if (!isInitialLoadRef.current && !hasNewMajorQuake) {
-              if (f.properties.mag >= 5.0 && !previousIdsRef.current.has(f.id)) {
-                  hasNewMajorQuake = true;
-              }
-          }
+      if (!isInitialLoadRef.current) {
+          const newMajorQuakes = data.features.filter(f => {
+              const isMajor = f.properties.mag >= 5.0;
+              const isNew = !previousIdsRef.current.has(f.id);
+              return isMajor && isNew;
+          });
+          if (newMajorQuakes.length > 0) playSonarPing();
       }
 
-      if (hasNewMajorQuake) {
-          playSonarPing();
-      }
-
-      previousIdsRef.current = nextIds;
+      const currentIds = new Set(data.features.map(f => f.id));
+      previousIdsRef.current = currentIds;
       isInitialLoadRef.current = false;
       const sorted = data.features.sort((a, b) => b.properties.time - a.properties.time);
       setEarthquakes(sorted);
